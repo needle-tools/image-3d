@@ -7,7 +7,7 @@ import{chromium}from'@playwright/test';
 import{gzipSync}from'node:zlib';
 import{useBackend}from'./backends.mjs';
 const root=resolve('demo/public');let available=true;try{await access(resolve(root,'comparison.json'));}catch{available=false;}
-test('one comparison page switches models, resolutions, appearance, references and a scrolling grid',{timeout:120000,skip:!available&&'Generate the shared owl/watch captures using experiments/img-3d/README.md'},async()=>{
+test('one comparison page switches models, resolutions, appearance, references and a scrolling grid',{timeout:120000,skip:!available&&'Build the comparison with npm run dev'},async()=>{
  const requests=[],server=createServer(async(req,res)=>{try{const name=decodeURIComponent(req.url.split('?')[0]);const path=resolve(root,'.'+(name==='/'?'/index.html':name));if(!path.startsWith(root+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':extname(path)==='.html'?'text/html':'application/octet-stream');res.end(await readFile(path));}catch{res.statusCode=404;res.end();}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-webgl','--enable-unsafe-swiftshader']});
  try{

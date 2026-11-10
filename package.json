@@ -43,7 +43,8 @@
     "test:native": "node --test tests/baked.test.mjs",
     "gpu:install": "npm install --no-save webgpu",
     "prepare": "npm run build",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "pretest": "npm run build && node tools/demo.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "4.4.2",
