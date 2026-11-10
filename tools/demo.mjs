@@ -1,15 +1,16 @@
 import {build} from 'esbuild';
 // One comparison page for all fixtures and codecs; no per-variant UI to maintain.
-import{readFile,writeFile,copyFile}from'node:fs/promises';
+import{readFile,writeFile,copyFile,mkdir}from'node:fs/promises';
 import{resolve}from'node:path';
 import{gzipSync}from'node:zlib';
 const directory=resolve(process.argv[2]??'demo/public'),models=JSON.parse(await readFile(new URL('../demo/catalog.json',import.meta.url),'utf8'));
 const runtimeGzip=Object.fromEntries(await Promise.all(['img-3d.js','img-3d-xuastc.js'].map(async name=>[name,gzipSync(await readFile(resolve('dist',name))).length])));
 for(const model of models)for(const resolution of model.resolutions)for(const variant of resolution.variants){if(variant.id==='webp')continue;const bytes=runtimeGzip[variant.id.endsWith('xuastc')?'img-3d-xuastc.js':'img-3d.js'];variant.totalGzip+=bytes-variant.runtimeGzip;variant.runtimeGzip=bytes;}
-for(const name of ['img-3d.js','img-3d-xuastc.js'])await copyFile(resolve('dist',name),resolve(directory,name));
-await copyFile(new URL('../demo/grid.js',import.meta.url),resolve(directory,'grid.js'));
+await mkdir(resolve(directory,'runtime'),{recursive:true});
+for(const name of ['img-3d.js','img-3d-xuastc.js'])await copyFile(resolve('dist',name),resolve(directory,'runtime',name));
+await copyFile(new URL('../demo/grid.js',import.meta.url),resolve(directory,'runtime/grid.js'));
 const turntable=await build({entryPoints:['demo/turntable-runtime.js'],bundle:true,minify:true,format:'esm',write:false,target:'es2022'});
-await writeFile(resolve(directory,'turntable.js'),turntable.outputFiles[0].contents);
+await writeFile(resolve(directory,'runtime/turntable.js'),turntable.outputFiles[0].contents);
 await writeFile(resolve(directory,'comparison.json'),JSON.stringify(models,null,2));
 const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>img-3d</title>
 <style>
@@ -23,10 +24,10 @@ const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="vie
 <details id="measurements"><summary>Measurements</summary><div id="measurementScroll"><table><thead><tr><th>Appearance</th><th>Capture</th><th title="One viewer + one complete capture over gzip, including minimal HTML; WebP includes all 32 images">Total gzip</th><th title="Measured texture payload for 3D. WebP shows the decoded RGBA size of all 32 images, an estimate rather than measured browser residency. Excludes driver and raster-canvas overhead.">Textures / images</th><th title="Codec error only: 36 views for 3D or 32 captured angles for WebP. Does not measure angular stepping or source approximation.">Codec PSNR</th><th title="Lossless baked angular approximation versus full studio PBR; independent of codec error">Lighting match</th></tr></thead><tbody id="metrics"></tbody></table></div></details>
 
 <script type="module">
-import './img-3d.js';
-import {attachGridInteraction} from './grid.js';
+import './runtime/img-3d.js';
+import {attachGridInteraction} from './runtime/grid.js';
 const models=${JSON.stringify(models).replaceAll('<','\\u003c')};
-if(models.some(m=>m.resolutions.some(r=>r.turntable)))await import('./turntable.js');
+if(models.some(m=>m.resolutions.some(r=>r.turntable)))await import('./runtime/turntable.js');
 const byId=id=>document.getElementById(id),model=byId('model'),resolution=byId('resolution'),appearance=byId('appearance'),viewer=byId('viewer'),turntable=byId('turntable'),light=byId('light'),many=byId('many'),reference=byId('reference'),grid=byId('grid'),stage=byId('stage'),view=byId('view'),gridSize=byId('gridSize');
 const bytes=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':(n/1000).toFixed(1)+' KB';let generation=0,decoder,tiles=[],animation=0,stageVisible=true,gridVisible=false;
 const follow=byId('follow'),gridInteraction=attachGridInteraction(grid,()=>tiles);
@@ -36,7 +37,7 @@ controls();
 function selected(){const m=models.find(m=>m.id===model.value),r=m.resolutions.find(r=>String(r.size)===resolution.value);return [m,r,r.variants.find(v=>v.id===appearance.value)];}
 const active=()=>appearance.value==='webp'?turntable:viewer;
 const angles=r=>appearance.value==='webp'?Array.from({length:32},(_,i)=>[i*Math.PI/16,r.turntable.pitch]):r.views;
-function matchView(){const [,r]=selected(),views=angles(r),index=Math.min(Number(view.value),views.length-1),[yaw,pitch]=views[index],el=active();el.yaw=yaw;el.pitch=pitch;el.distance=4;el.draw();byId('referenceImage').src=(appearance.value==='webp'?r.turntable.folder+'/source-':r.referencePrefix)+index+'.png';byId('viewNumber').textContent=(index+1)+' / '+views.length;}
+function matchView(){const [,r]=selected(),views=angles(r),index=Math.min(Number(view.value),views.length-1),[yaw,pitch]=views[index],el=active();el.yaw=yaw;el.pitch=pitch;el.distance=4;el.draw();byId('referenceImage').src=r.referencePrefix+index+'.png';byId('viewNumber').textContent=(index+1)+' / '+views.length;}
 function animate(){
  cancelAnimationFrame(animation);animation=0;
  if(!light.checked||!appearance.value.startsWith('pbr')||document.hidden||!(many.checked?gridVisible:stageVisible))return;
@@ -58,11 +59,11 @@ async function update(){
  const rows=many.checked?gridModels.map(({model,variant})=>({...variant,name:model.label})):r.variants;
  byId('metrics').closest('table').querySelector('th').textContent=many.checked?'Model':'Appearance';
  for(const row of rows){const r=row,tr=document.createElement('tr');tr.className=!many.checked&&r.id===v.id?'selected':'';for(const text of [r.name,bytes(r.assetBytes),bytes(r.totalGzip),r.imageBytes?bytes(r.imageBytes)+' RGBA (all frames)':bytes(r.textureBytes)+' '+r.textureFormat.toUpperCase(),r.codecPsnr.toFixed(1)+' dB',r.lighting?r.lighting.meanPsnr.toFixed(1)+' dB':'—']){const td=document.createElement('td');td.textContent=text;tr.append(td);}byId('metrics').append(tr);}
- if(v.id.endsWith('xuastc')){decoder??=import('./img-3d-xuastc.js');await decoder;if(stamp!==generation)return;}
+ if(v.id.endsWith('xuastc')){decoder??=import('./runtime/img-3d-xuastc.js');await decoder;if(stamp!==generation)return;}
  const moving=light.checked&&v.id.startsWith('pbr')&&!many.checked;
- stage.hidden=many.checked;grid.hidden=!many.checked;reference.disabled=many.checked||moving;light.disabled=!v.id.startsWith('pbr');byId('viewControls').hidden=!reference.checked||many.checked||moving;
+ stage.hidden=many.checked;grid.hidden=!many.checked;reference.disabled=many.checked||moving||isWebp;light.disabled=!v.id.startsWith('pbr');byId('viewControls').hidden=!reference.checked||many.checked||moving||isWebp;
  gridSize.disabled=follow.disabled=!many.checked;model.disabled=many.checked;model.title=many.checked?'Grid shows every model':'';
- const compare=reference.checked&&!moving;stage.classList.toggle('reference',compare);byId('referenceFigure').hidden=!compare;
+ const compare=reference.checked&&!moving&&!isWebp;stage.classList.toggle('reference',compare);byId('referenceFigure').hidden=!compare;
  viewer.hidden=isWebp;turntable.hidden=!isWebp;
  viewer.lighting=null;
  if(many.checked){

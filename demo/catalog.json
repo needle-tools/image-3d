@@ -9,7 +9,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "small/model.i3d",
+            "src": "owl-512-i3d/live.i3d",
             "assetBytes": 519352,
             "runtimeGzip": 24240,
             "totalGzip": 544022,
@@ -23,7 +23,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "xuastc-pbr-owl/model.i3d",
+            "src": "owl-512-i3d/live-xuastc.i3d",
             "assetBytes": 525165,
             "runtimeGzip": 175022,
             "totalGzip": 700620,
@@ -38,7 +38,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "baked-owl/model.i3d",
+            "src": "owl-512-i3d/baked.i3d",
             "assetBytes": 309335,
             "runtimeGzip": 24240,
             "totalGzip": 334006,
@@ -55,7 +55,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "xuastc-owl/model.i3d",
+            "src": "owl-512-i3d/baked-xuastc.i3d",
             "assetBytes": 326608,
             "runtimeGzip": 175022,
             "totalGzip": 502063,
@@ -73,7 +73,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/owl/512/model.json",
+            "src": "owl-512-32views/model.json",
             "assetBytes": 347674,
             "totalGzip": 348526,
             "codecPsnr": 30.4120267941908,
@@ -83,7 +83,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/owl/512",
+          "folder": "owl-512-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -235,12 +235,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "baked-owl/studio-source-",
+        "referencePrefix": "owl-512-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.9648361861978159,
           "meanPsnr": 18.930085191878998
-        }
+        },
+        "losslessBaked": "owl-512-i3d/baked-lossless.i3d"
       },
       {
         "size": 1024,
@@ -248,7 +249,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "owl-1024/model.i3d",
+            "src": "owl-1024-i3d/live.i3d",
             "assetBytes": 1739406,
             "runtimeGzip": 24240,
             "totalGzip": 1764079,
@@ -262,7 +263,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/owl/1024/pbr-xuastc/model.i3d",
+            "src": "owl-1024-i3d/live-xuastc.i3d",
             "assetBytes": 1776980,
             "runtimeGzip": 175022,
             "totalGzip": 1952437,
@@ -277,7 +278,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/owl/1024/baked/model.i3d",
+            "src": "owl-1024-i3d/baked.i3d",
             "assetBytes": 1060385,
             "runtimeGzip": 24240,
             "totalGzip": 1085057,
@@ -294,7 +295,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/owl/1024/baked-xuastc/model.i3d",
+            "src": "owl-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 1164203,
             "runtimeGzip": 175022,
             "totalGzip": 1339659,
@@ -312,7 +313,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/owl/1024/model.json",
+            "src": "owl-1024-32views/model.json",
             "assetBytes": 1002103,
             "totalGzip": 1002954,
             "codecPsnr": 31.513515246646634,
@@ -322,7 +323,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/owl/1024",
+          "folder": "owl-1024-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -474,12 +475,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/owl/1024/baked/studio-source-",
+        "referencePrefix": "owl-1024-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.9860665795827891,
           "meanPsnr": 20.014468528580462
-        }
+        },
+        "losslessBaked": "owl-1024-i3d/baked-lossless.i3d"
       }
     ]
   },
@@ -493,7 +495,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "watch/model.i3d",
+            "src": "watch-512-i3d/live.i3d",
             "assetBytes": 320358,
             "runtimeGzip": 24240,
             "totalGzip": 345028,
@@ -507,7 +509,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/watch/512/pbr-xuastc/model.i3d",
+            "src": "watch-512-i3d/live-xuastc.i3d",
             "assetBytes": 326122,
             "runtimeGzip": 175022,
             "totalGzip": 501577,
@@ -522,7 +524,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "baked-watch/model.i3d",
+            "src": "watch-512-i3d/baked.i3d",
             "assetBytes": 186255,
             "runtimeGzip": 24240,
             "totalGzip": 210924,
@@ -539,7 +541,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "xuastc-watch/model.i3d",
+            "src": "watch-512-i3d/baked-xuastc.i3d",
             "assetBytes": 248241,
             "runtimeGzip": 175022,
             "totalGzip": 423696,
@@ -557,7 +559,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/watch/512/model.json",
+            "src": "watch-512-32views/model.json",
             "assetBytes": 386104,
             "totalGzip": 386956,
             "codecPsnr": 33.657578225919465,
@@ -567,7 +569,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/watch/512",
+          "folder": "watch-512-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -719,12 +721,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "baked-watch/studio-source-",
+        "referencePrefix": "watch-512-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.9202486635543408,
           "meanPsnr": 14.69088215178747
-        }
+        },
+        "losslessBaked": "watch-512-i3d/baked-lossless.i3d"
       },
       {
         "size": 1024,
@@ -732,7 +735,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "matrix/watch/1024/pbr/model.i3d",
+            "src": "watch-1024-i3d/live.i3d",
             "assetBytes": 688393,
             "runtimeGzip": 24240,
             "totalGzip": 713063,
@@ -746,7 +749,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/watch/1024/pbr-xuastc/model.i3d",
+            "src": "watch-1024-i3d/live-xuastc.i3d",
             "assetBytes": 714297,
             "runtimeGzip": 175022,
             "totalGzip": 889752,
@@ -761,7 +764,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/watch/1024/baked/model.i3d",
+            "src": "watch-1024-i3d/baked.i3d",
             "assetBytes": 529021,
             "runtimeGzip": 24240,
             "totalGzip": 553691,
@@ -778,7 +781,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/watch/1024/baked-xuastc/model.i3d",
+            "src": "watch-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 744566,
             "runtimeGzip": 175022,
             "totalGzip": 920022,
@@ -796,7 +799,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/watch/1024/model.json",
+            "src": "watch-1024-32views/model.json",
             "assetBytes": 939995,
             "totalGzip": 940846,
             "codecPsnr": 35.63739185760269,
@@ -806,7 +809,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/watch/1024",
+          "folder": "watch-1024-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -958,12 +961,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/watch/1024/baked/studio-source-",
+        "referencePrefix": "watch-1024-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.9633152861407681,
           "meanPsnr": 15.07179733900866
-        }
+        },
+        "losslessBaked": "watch-1024-i3d/baked-lossless.i3d"
       }
     ]
   },
@@ -977,7 +981,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "matrix/decor/512/pbr/model.i3d",
+            "src": "decor-512-i3d/live.i3d",
             "assetBytes": 335031,
             "runtimeGzip": 24240,
             "totalGzip": 359701,
@@ -991,7 +995,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/decor/512/pbr-xuastc/model.i3d",
+            "src": "decor-512-i3d/live-xuastc.i3d",
             "assetBytes": 366270,
             "runtimeGzip": 175022,
             "totalGzip": 541726,
@@ -1006,7 +1010,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/decor/512/baked/model.i3d",
+            "src": "decor-512-i3d/baked.i3d",
             "assetBytes": 203982,
             "runtimeGzip": 24240,
             "totalGzip": 228652,
@@ -1023,7 +1027,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/decor/512/baked-xuastc/model.i3d",
+            "src": "decor-512-i3d/baked-xuastc.i3d",
             "assetBytes": 265306,
             "runtimeGzip": 175022,
             "totalGzip": 440761,
@@ -1041,7 +1045,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/decor/512/model.json",
+            "src": "decor-512-32views/model.json",
             "assetBytes": 184424,
             "totalGzip": 185276,
             "codecPsnr": 35.53648251709966,
@@ -1051,7 +1055,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/decor/512",
+          "folder": "decor-512-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -1203,12 +1207,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/decor/512/baked/studio-source-",
+        "referencePrefix": "decor-512-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.8898552791045841,
           "meanPsnr": 23.29531312730145
-        }
+        },
+        "losslessBaked": "decor-512-i3d/baked-lossless.i3d"
       },
       {
         "size": 1024,
@@ -1216,7 +1221,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "matrix/decor/1024/pbr/model.i3d",
+            "src": "decor-1024-i3d/live.i3d",
             "assetBytes": 987742,
             "runtimeGzip": 24240,
             "totalGzip": 1012413,
@@ -1230,7 +1235,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/decor/1024/pbr-xuastc/model.i3d",
+            "src": "decor-1024-i3d/live-xuastc.i3d",
             "assetBytes": 995445,
             "runtimeGzip": 175022,
             "totalGzip": 1170900,
@@ -1245,7 +1250,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/decor/1024/baked/model.i3d",
+            "src": "decor-1024-i3d/baked.i3d",
             "assetBytes": 600782,
             "runtimeGzip": 24240,
             "totalGzip": 625452,
@@ -1262,7 +1267,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/decor/1024/baked-xuastc/model.i3d",
+            "src": "decor-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 718756,
             "runtimeGzip": 175022,
             "totalGzip": 894211,
@@ -1280,7 +1285,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/decor/1024/model.json",
+            "src": "decor-1024-32views/model.json",
             "assetBytes": 464831,
             "totalGzip": 465682,
             "codecPsnr": 37.125852853115,
@@ -1290,7 +1295,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/decor/1024",
+          "folder": "decor-1024-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -1442,12 +1447,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/decor/1024/baked/studio-source-",
+        "referencePrefix": "decor-1024-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.9378851645874042,
           "meanPsnr": 25.45195400862946
-        }
+        },
+        "losslessBaked": "decor-1024-i3d/baked-lossless.i3d"
       }
     ]
   },
@@ -1461,7 +1467,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "matrix/motorcycle/512/pbr/model.i3d",
+            "src": "motorcycle-512-i3d/live.i3d",
             "assetBytes": 432083,
             "runtimeGzip": 24240,
             "totalGzip": 456753,
@@ -1475,7 +1481,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/motorcycle/512/pbr-xuastc/model.i3d",
+            "src": "motorcycle-512-i3d/live-xuastc.i3d",
             "assetBytes": 408410,
             "runtimeGzip": 175022,
             "totalGzip": 583865,
@@ -1490,7 +1496,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/motorcycle/512/baked/model.i3d",
+            "src": "motorcycle-512-i3d/baked.i3d",
             "assetBytes": 297174,
             "runtimeGzip": 24240,
             "totalGzip": 321845,
@@ -1507,7 +1513,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/motorcycle/512/baked-xuastc/model.i3d",
+            "src": "motorcycle-512-i3d/baked-xuastc.i3d",
             "assetBytes": 309316,
             "runtimeGzip": 175022,
             "totalGzip": 484771,
@@ -1525,7 +1531,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/motorcycle/512/model.json",
+            "src": "motorcycle-512-32views/model.json",
             "assetBytes": 240382,
             "totalGzip": 241234,
             "codecPsnr": 29.743509676030598,
@@ -1535,7 +1541,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/motorcycle/512",
+          "folder": "motorcycle-512-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -1687,12 +1693,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/motorcycle/512/baked/studio-source-",
+        "referencePrefix": "motorcycle-512-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.9343386059447245,
           "meanPsnr": 15.772944664698912
-        }
+        },
+        "losslessBaked": "motorcycle-512-i3d/baked-lossless.i3d"
       },
       {
         "size": 1024,
@@ -1700,7 +1707,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "matrix/motorcycle/1024/pbr/model.i3d",
+            "src": "motorcycle-1024-i3d/live.i3d",
             "assetBytes": 1243478,
             "runtimeGzip": 24240,
             "totalGzip": 1268149,
@@ -1714,7 +1721,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/motorcycle/1024/pbr-xuastc/model.i3d",
+            "src": "motorcycle-1024-i3d/live-xuastc.i3d",
             "assetBytes": 1244899,
             "runtimeGzip": 175022,
             "totalGzip": 1420354,
@@ -1729,7 +1736,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/motorcycle/1024/baked/model.i3d",
+            "src": "motorcycle-1024-i3d/baked.i3d",
             "assetBytes": 815967,
             "runtimeGzip": 24240,
             "totalGzip": 840637,
@@ -1746,7 +1753,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/motorcycle/1024/baked-xuastc/model.i3d",
+            "src": "motorcycle-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 1016114,
             "runtimeGzip": 175022,
             "totalGzip": 1191569,
@@ -1764,7 +1771,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/motorcycle/1024/model.json",
+            "src": "motorcycle-1024-32views/model.json",
             "assetBytes": 638915,
             "totalGzip": 639766,
             "codecPsnr": 31.72780564570582,
@@ -1774,7 +1781,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/motorcycle/1024",
+          "folder": "motorcycle-1024-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -1926,12 +1933,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/motorcycle/1024/baked/studio-source-",
+        "referencePrefix": "motorcycle-1024-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.9660513282305268,
           "meanPsnr": 16.185548823687768
-        }
+        },
+        "losslessBaked": "motorcycle-1024-i3d/baked-lossless.i3d"
       }
     ]
   },
@@ -1945,7 +1953,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "matrix/boat/512/pbr/model.i3d",
+            "src": "boat-512-i3d/live.i3d",
             "assetBytes": 381886,
             "runtimeGzip": 24240,
             "totalGzip": 406556,
@@ -1959,7 +1967,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/boat/512/pbr-xuastc/model.i3d",
+            "src": "boat-512-i3d/live-xuastc.i3d",
             "assetBytes": 369216,
             "runtimeGzip": 175022,
             "totalGzip": 544671,
@@ -1974,7 +1982,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/boat/512/baked/model.i3d",
+            "src": "boat-512-i3d/baked.i3d",
             "assetBytes": 180999,
             "runtimeGzip": 24240,
             "totalGzip": 205668,
@@ -1991,7 +1999,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/boat/512/baked-xuastc/model.i3d",
+            "src": "boat-512-i3d/baked-xuastc.i3d",
             "assetBytes": 236537,
             "runtimeGzip": 175022,
             "totalGzip": 411993,
@@ -2009,7 +2017,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/boat/512/model.json",
+            "src": "boat-512-32views/model.json",
             "assetBytes": 179598,
             "totalGzip": 180450,
             "codecPsnr": 33.21322300277459,
@@ -2019,7 +2027,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/boat/512",
+          "folder": "boat-512-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -2171,12 +2179,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/boat/512/baked/studio-source-",
+        "referencePrefix": "boat-512-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.8091091245376079,
           "meanPsnr": 19.625442406400328
-        }
+        },
+        "losslessBaked": "boat-512-i3d/baked-lossless.i3d"
       },
       {
         "size": 1024,
@@ -2184,7 +2193,7 @@
           {
             "id": "pbr",
             "name": "Live light",
-            "src": "matrix/boat/1024/pbr/model.i3d",
+            "src": "boat-1024-i3d/live.i3d",
             "assetBytes": 887353,
             "runtimeGzip": 24240,
             "totalGzip": 912023,
@@ -2198,7 +2207,7 @@
           {
             "id": "pbr-xuastc",
             "name": "Live light \u2013 XUASTC",
-            "src": "matrix/boat/1024/pbr-xuastc/model.i3d",
+            "src": "boat-1024-i3d/live-xuastc.i3d",
             "assetBytes": 958008,
             "runtimeGzip": 175022,
             "totalGzip": 1133463,
@@ -2213,7 +2222,7 @@
           {
             "id": "baked",
             "name": "Baked studio",
-            "src": "matrix/boat/1024/baked/model.i3d",
+            "src": "boat-1024-i3d/baked.i3d",
             "assetBytes": 558975,
             "runtimeGzip": 24240,
             "totalGzip": 583643,
@@ -2230,7 +2239,7 @@
           {
             "id": "baked-xuastc",
             "name": "Baked studio \u2013 XUASTC",
-            "src": "matrix/boat/1024/baked-xuastc/model.i3d",
+            "src": "boat-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 746068,
             "runtimeGzip": 175022,
             "totalGzip": 921524,
@@ -2248,7 +2257,7 @@
           {
             "id": "webp",
             "name": "32 WebP views",
-            "src": "turntable/boat/1024/model.json",
+            "src": "boat-1024-32views/model.json",
             "assetBytes": 508777,
             "totalGzip": 509628,
             "codecPsnr": 33.90986414311003,
@@ -2258,7 +2267,7 @@
           }
         ],
         "turntable": {
-          "folder": "turntable/boat/1024",
+          "folder": "boat-1024-32views",
           "pitch": 0.2,
           "distance": 4,
           "frames": 32,
@@ -2410,12 +2419,13 @@
             -0.25
           ]
         ],
-        "referencePrefix": "matrix/boat/1024/baked/studio-source-",
+        "referencePrefix": "boat-1024-i3d/reference/source-",
         "referenceLabel": "Studio source",
         "sourceQuality": {
           "minIoU": 0.8835571026023538,
           "meanPsnr": 20.985818573750258
-        }
+        },
+        "losslessBaked": "boat-1024-i3d/baked-lossless.i3d"
       }
     ]
   }

@@ -24,6 +24,33 @@ the five-model demo at 512 and 1024, live/baked lighting, native/XUASTC variants
 asset download is needed to run it. Generated runtime bundles are copied into
 the demo when starting it.
 
+`demo/public/` has one folder per model, resolution and representation:
+
+```text
+owl-512-i3d/
+  live.i3d
+  live-xuastc.i3d
+  baked.i3d
+  baked-xuastc.i3d
+  baked-lossless.i3d
+  reference/
+owl-512-32views/
+  model.json
+  view-0.webp
+  …
+owl-1024-i3d/
+owl-1024-32views/
+watch-512-i3d/
+watch-512-32views/
+…
+runtime/
+```
+
+The same layout applies to all five models at both resolutions. The lossless
+baked capture and reference PNGs support quality comparisons. Folders ending
+in `-32views` hold source-rendered WebP turntables; `runtime/` contains generated JavaScript.
+Browser-test screenshots stay under `.local/test-results/demo/`.
+
 ## Use the runtime
 
 After building, load one JavaScript file:

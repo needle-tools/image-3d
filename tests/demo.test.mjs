@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {createServer} from 'node:http';
-import {readFile,access} from 'node:fs/promises';
+import {readFile,access,mkdir} from 'node:fs/promises';
 import{resolve,extname}from'node:path';
 import{chromium}from'@playwright/test';
 import{gzipSync}from'node:zlib';
 import{useBackend}from'./backends.mjs';
 const root=resolve('demo/public');let available=true;try{await access(resolve(root,'comparison.json'));}catch{available=false;}
 test('one comparison page switches models, resolutions, appearance, references and a scrolling grid',{timeout:120000,skip:!available&&'Build the comparison with npm run dev'},async()=>{
+ const screenshots=resolve('.local/test-results/demo');await mkdir(screenshots,{recursive:true});
  const requests=[],server=createServer(async(req,res)=>{try{const name=decodeURIComponent(req.url.split('?')[0]);const path=resolve(root,'.'+(name==='/'?'/index.html':name));if(!path.startsWith(root+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':extname(path)==='.html'?'text/html':'application/octet-stream');res.end(await readFile(path));}catch{res.statusCode=404;res.end();}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-webgl','--enable-unsafe-swiftshader']});
  try{
-  const page=await browser.newPage({viewport:{width:1200,height:900}}),errors=[];page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(String(e)));page.on('request',r=>requests.push(r.url()));
+  const page=await browser.newPage({viewport:{width:1200,height:900}}),errors=[],missing=[];page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(String(e)));page.on('request',r=>requests.push(r.url()));page.on('response',r=>{if(r.status()>=400)missing.push(r.status()+' '+r.url());});
   await useBackend(page,'webgpu');await page.addInitScript(()=>{const copy=CanvasRenderingContext2D.prototype.drawImage;CanvasRenderingContext2D.prototype.drawImage=function(...args){window.presents.set(this.canvas,(window.presents.get(this.canvas)||0)+1);return copy.apply(this,args);};});
   await page.goto(`http://127.0.0.1:${server.address().port}`);await page.waitForFunction(()=>document.querySelector('#viewer')?.data);
   assert(!requests.some(r=>r.endsWith('/img-3d-xuastc.js')),'Decoder downloaded for native appearance');
@@ -20,7 +21,7 @@ test('one comparison page switches models, resolutions, appearance, references a
   await page.getByLabel('Reference',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('#referenceImage').complete&&document.querySelector('#referenceImage').naturalWidth>0);
   await page.locator('#view').fill('9');await page.locator('#view').dispatchEvent('input');
   await page.waitForFunction(()=>document.querySelector('#viewer').yaw===Math.PI*1.5);
-  await page.screenshot({path:resolve(root,'comparison-reference.png')});
+  await page.screenshot({path:resolve(screenshots,'comparison-reference.png')});
   await page.locator('#viewer canvas').dispatchEvent('wheel',{altKey:true,deltaY:100});assert.equal(await page.getByLabel('Reference',{exact:true}).isChecked(),false,'Zoom left an unmatched reference visible');
   await page.getByLabel('Reference',{exact:true}).check();
   assert.equal(await page.locator('#measurements').getAttribute('open'),null,'Measurements should start collapsed');
@@ -41,6 +42,10 @@ test('one comparison page switches models, resolutions, appearance, references a
    await page.getByLabel('Resolution',{exact:true}).selectOption(String(resolution.size));
    await page.getByLabel('Appearance',{exact:true}).selectOption(variant.id);
    await page.waitForFunction(({src,size,webp})=>{const el=document.querySelector(webp?'#turntable':'#viewer');return el.data&&el.src===src&&(webp?el.data.size===size&&Number.isInteger(el.frame)&&el.image.naturalWidth===size&&el.image.src.includes(src.replace('model.json','view-')):el.data.pages[0].size===size);},{src:variant.src,size:resolution.size,webp:variant.id==='webp'});
+   if(variant.id==='webp'){
+    assert.equal(await page.getByLabel('Reference',{exact:true}).isEnabled(),false);
+    assert.equal(await page.locator('#referenceFigure').isVisible(),false,'Source turntable showed a missing reference image');
+   }
    assert.equal(await page.evaluate(()=>{const s=customElements.get('img-3d').statistics;return s.backend==='webgpu'?s.devices:s.contexts;}),1);count++;
    if(model.id==='watch'&&resolution.size===512&&variant.id==='baked-xuastc'){
     const before=await page.evaluate(()=>document.querySelector('#viewer').yaw),box=await page.locator('#viewer canvas').boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+30,box.y+box.height/2);await page.mouse.up();assert(Math.abs(await page.evaluate(()=>document.querySelector('#viewer').yaw)-before)>.1,'First drag leaving XUASTC reference was lost');await page.getByLabel('Reference',{exact:true}).check();
@@ -76,7 +81,7 @@ test('one comparison page switches models, resolutions, appearance, references a
    await page.mouse.down();await follows(start,true,id);await expanded(tag);await transparent(target);await transparent(target.locator('..'));assert.equal(await page.locator('#grid [data-dragging]').count(),1);
    if(tag==='img-3d'){
     const raster=await target.evaluate(async el=>{await el.draw();return{width:el.canvas.width,expected:Math.round(el.clientWidth*Math.min(devicePixelRatio||1,2)),cornerAlpha:(()=>{const copy=new OffscreenCanvas(el.canvas.width,el.canvas.height),ctx=copy.getContext('2d');ctx.drawImage(el.canvas,0,0);return ctx.getImageData(0,0,1,1).data[3];})()};});assert.equal(raster.width,raster.expected,'Expanded view stretched a low-resolution canvas');assert.equal(raster.cornerAlpha,0,'Canvas background is not transparent');
-    await page.screenshot({path:resolve(root,'comparison-grid-expanded.png')});
+    await page.screenshot({path:resolve(screenshots,'comparison-grid-expanded.png')});
    }
    const glide=await page.evaluate(()=>({...window.glide,final:document.querySelector('#grid figure:nth-child(2) :is(img-3d,img-turntable)').yaw}));
    assert.equal(glide.synchronous,glide.before,'Click jumped to the look-away pose');assert(Math.abs(glide.first-glide.before)>1e-4&&Math.abs(glide.first-glide.before)<Math.abs(glide.final-glide.before),'Look-away did not ease through intermediate angles');assert(Math.abs(glide.final)<=.551,'Look-away turned the model around');
@@ -100,7 +105,7 @@ test('one comparison page switches models, resolutions, appearance, references a
   await page.getByLabel('Item size',{exact:true}).fill('280');await page.getByLabel('Item size',{exact:true}).dispatchEvent('input');
   const large=await page.locator('#grid img-turntable').first().boundingBox();assert(large.width>small.width*2&&large.height>small.height*2);
   await page.getByLabel('Item size',{exact:true}).fill('180');await page.getByLabel('Item size',{exact:true}).dispatchEvent('input');
-  await page.screenshot({path:resolve(root,'comparison-grid.png')});
+  await page.screenshot({path:resolve(screenshots,'comparison-grid.png')});
   await page.evaluate(()=>scrollTo(0,0));await page.getByLabel('Grid',{exact:true}).uncheck();await page.getByLabel('Appearance',{exact:true}).selectOption('baked-xuastc');await page.waitForFunction(()=>document.querySelector('#viewer')?.data?.appearance==='baked');
   await page.getByLabel('Grid',{exact:true}).check();await checkGridSources('img-3d');await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.data;}));await dragGrid('img-3d');
   await page.getByLabel('Follow mouse',{exact:true}).uncheck();
@@ -126,14 +131,14 @@ test('one comparison page switches models, resolutions, appearance, references a
   assert.equal(await page.evaluate(()=>customElements.get('img-3d').statistics.decodes),uploads,'Mixed-model hover thrashed the GPU cache');
   const workingSet=await page.evaluate(()=>customElements.get('img-3d').statistics);assert(workingSet.activeTextureBytes>workingSet.gpuBytes,'Large visible working set did not exceed the inactive-cache limit');assert(workingSet.inactiveTextureBytes<=workingSet.gpuBytes);
   await page.getByLabel('Resolution',{exact:true}).selectOption('512');await checkGridSources('img-3d');await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.data?.pages[0].size===512;}));
-  await page.setViewportSize({width:390,height:700});assert(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth),'Narrow layout overflows horizontally');await page.screenshot({path:resolve(root,'comparison-mobile.png')});
+  await page.setViewportSize({width:390,height:700});assert(await page.evaluate(()=>document.documentElement.scrollWidth===innerWidth),'Narrow layout overflows horizontally');await page.screenshot({path:resolve(screenshots,'comparison-mobile.png')});
   await page.setViewportSize({width:700,height:600});
   await page.locator('#grid img-3d').last().scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelector('#grid figure:last-child img-3d')?.data);
   const result=await page.evaluate(()=>({contexts:(s=>s.backend==='webgpu'?s.devices:s.contexts)(customElements.get('img-3d').statistics),format:document.querySelector('#grid figure:last-child img-3d').textureFormat}));assert.equal(result.contexts,1);assert(['astc','bc7','rgba'].includes(result.format));
   await page.evaluate(()=>scrollTo(0,0));await page.getByLabel('Grid',{exact:true}).uncheck();await page.setViewportSize({width:1200,height:900});await page.waitForFunction(()=>document.querySelector('#viewer')?.data);assert.equal(await page.locator('#grid figure').count(),0);assert.equal(await page.getByLabel('Model',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Item size',{exact:true}).isEnabled(),false);assert.equal(await page.getByLabel('Follow mouse',{exact:true}).isEnabled(),false);
   await page.getByLabel('Reference',{exact:true}).uncheck();await page.locator('#viewer canvas').press('ArrowRight');await page.getByRole('button',{name:'Reset view'}).click();assert.equal(await page.evaluate(()=>document.querySelector('#viewer').yaw),.55);
   await page.getByLabel('Appearance',{exact:true}).selectOption('baked');await page.waitForFunction(()=>document.querySelector('#viewer')?.data?.appearance==='baked');
-  await page.screenshot({path:resolve(root,'comparison.png')});assert.deepEqual(errors,[]);
+  await page.screenshot({path:resolve(screenshots,'comparison.png')});assert.deepEqual(errors,[]);assert.deepEqual(missing,[],'Demo requested missing assets');
   console.log('One page:50 appearances, 120-item mixed grids with shared settings and adjustable sizes, cursor following, solo drag, release/cancel and scrolling passed.');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 });

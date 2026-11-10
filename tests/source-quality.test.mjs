@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {createServer} from 'node:http';
 import {readFile,access} from 'node:fs/promises';
-import {resolve,dirname,extname} from 'node:path';
+import {resolve,extname} from 'node:path';
 import {chromium} from '@playwright/test';
 import sharp from 'sharp';
 import {computeSilhouetteError,computeForegroundRenderError} from './support/impostor-quality.js';
@@ -35,7 +35,7 @@ test('WebGPU renders stay within the previous renderer’s source-quality scores
    const page=await browser.newPage({viewport:{width:640,height:640},deviceScaleFactor:dpr}),errors=[];page.on('pageerror',e=>errors.push(String(e)));await useBackend(page,'webgpu');
    await page.goto(`http://127.0.0.1:${server.address().port}/?size=${css}`);await page.waitForFunction(()=>customElements.get('img-3d'));
    for(const model of catalog)for(const resolution of model.resolutions){
-    for(const [appearance,src] of [['baked','/'+dirname(resolution.referencePrefix)+'/model-png-100.i3d'],['pbr','/'+resolution.variants.find(v=>v.id==='pbr').src]]){
+    for(const [appearance,src] of [['baked','/'+resolution.losslessBaked],['pbr','/'+resolution.variants.find(v=>v.id==='pbr').src]]){
      const expected=baseline.rows.find(r=>r.mode===mode&&r.model===model.id&&r.size===resolution.size&&r.appearance===appearance);assert(expected,`No baseline for ${mode} ${model.id} ${resolution.size} ${appearance}`);
      await page.evaluate(src=>new Promise((done,fail)=>{const el=document.querySelector('img-3d');el.addEventListener('load',done,{once:true});el.addEventListener('error',e=>fail(String(e.detail)),{once:true});el.src=src;}),src);
      const scores=[];
