@@ -1,0 +1,61 @@
+{
+  "name": "@needle-tools/image-3d",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dependency-free img-3d custom elements for compact single-file box captures.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/needle-tools/image-3d.git"
+  },
+  "sideEffects": [
+    "./dist/img-3d.js",
+    "./dist/img-3d-xuastc.js"
+  ],
+  "exports": {
+    ".": {
+      "types": "./src/runtime.d.ts",
+      "import": "./dist/img-3d.js"
+    },
+    "./xuastc": {
+      "types": "./src/runtime.d.ts",
+      "import": "./dist/img-3d-xuastc.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/",
+    "src/runtime.d.ts",
+    "README.md",
+    "LICENSES/"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && node tools/demo.mjs && vite preview --config demo/vite.config.js",
+    "convert": "node tools/export.mjs",
+    "validate": "node tools/validate.mjs",
+    "matrix": "node tools/matrix.mjs",
+    "test": "vitest run tests/converter.test.js && node --test --test-concurrency=1 tests/capture-input.test.mjs tests/browser.test.mjs tests/webgpu.test.mjs tests/lighting.test.mjs tests/many-elements.test.mjs tests/xuastc.test.mjs tests/surface-search.test.mjs tests/source-quality.test.mjs tests/demo.test.mjs",
+    "test:native": "node --test tests/baked.test.mjs",
+    "gpu:install": "npm install --no-save webgpu",
+    "prepare": "npm run build",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "@gltf-transform/core": "4.4.2",
+    "@gltf-transform/extensions": "4.4.2",
+    "@playwright/test": "1.62.1",
+    "esbuild": "0.25.12",
+    "sharp": "0.35.5",
+    "vite": "6.4.4",
+    "vitest": "4.1.10",
+    "typescript": "5.9.3",
+    "draco3d": "1.5.7",
+    "meshoptimizer": "1.2.0",
+    "three": "npm:@needle-tools/three@0.185.2-alpha.8"
+  }
+}

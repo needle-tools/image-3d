@@ -1,0 +1,2422 @@
+[
+  {
+    "id": "owl",
+    "label": "Owl",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "small/model.i3d",
+            "assetBytes": 519352,
+            "runtimeGzip": 24240,
+            "totalGzip": 544022,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 44.69502321416539,
+            "textureBytes": 5768960,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "xuastc-pbr-owl/model.i3d",
+            "assetBytes": 525165,
+            "runtimeGzip": 175022,
+            "totalGzip": 700620,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 40.69637970424792,
+            "textureBytes": 4196096,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "baked-owl/model.i3d",
+            "assetBytes": 309335,
+            "runtimeGzip": 24240,
+            "totalGzip": 334006,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 45.24857888212277,
+            "textureBytes": 3147520,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 18.81683286709165,
+              "minPsnr": 15.048359479220402
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "xuastc-owl/model.i3d",
+            "assetBytes": 326608,
+            "runtimeGzip": 175022,
+            "totalGzip": 502063,
+            "codec": "xuastc",
+            "quality": 100,
+            "block": "4x4",
+            "codecPsnr": 40.83785331008112,
+            "textureBytes": 2361088,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 18.81683286709165,
+              "minPsnr": 15.048359479220402
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/owl/512/model.json",
+            "assetBytes": 347674,
+            "totalGzip": 348526,
+            "codecPsnr": 30.4120267941908,
+            "imageBytes": 33554432,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/owl/512",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 10848.25
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "baked-owl/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.9648361861978159,
+          "meanPsnr": 18.930085191878998
+        }
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "owl-1024/model.i3d",
+            "assetBytes": 1739406,
+            "runtimeGzip": 24240,
+            "totalGzip": 1764079,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 45.73426378396417,
+            "textureBytes": 23070464,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/owl/1024/pbr-xuastc/model.i3d",
+            "assetBytes": 1776980,
+            "runtimeGzip": 175022,
+            "totalGzip": 1952437,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 41.69475173920651,
+            "textureBytes": 16779008,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/owl/1024/baked/model.i3d",
+            "assetBytes": 1060385,
+            "runtimeGzip": 24240,
+            "totalGzip": 1085057,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 45.69123841592766,
+            "textureBytes": 12584704,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 19.510617816241975,
+              "minPsnr": 16.536026294470755
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/owl/1024/baked-xuastc/model.i3d",
+            "assetBytes": 1164203,
+            "runtimeGzip": 175022,
+            "totalGzip": 1339659,
+            "codec": "xuastc",
+            "quality": 95,
+            "block": "4x4",
+            "codecPsnr": 41.20621863303333,
+            "textureBytes": 9438976,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 19.510617816241975,
+              "minPsnr": 16.536026294470755
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/owl/1024/model.json",
+            "assetBytes": 1002103,
+            "totalGzip": 1002954,
+            "codecPsnr": 31.513515246646634,
+            "imageBytes": 134217728,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/owl/1024",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 31299.125
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/owl/1024/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.9860665795827891,
+          "meanPsnr": 20.014468528580462
+        }
+      }
+    ]
+  },
+  {
+    "id": "watch",
+    "label": "Watch",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "watch/model.i3d",
+            "assetBytes": 320358,
+            "runtimeGzip": 24240,
+            "totalGzip": 345028,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 44.64791006291979,
+            "textureBytes": 4720384,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/watch/512/pbr-xuastc/model.i3d",
+            "assetBytes": 326122,
+            "runtimeGzip": 175022,
+            "totalGzip": 501577,
+            "codec": "xuastc",
+            "quality": 100,
+            "block": "6x6",
+            "codecPsnr": 42.756707002679484,
+            "textureBytes": 3790144,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "baked-watch/model.i3d",
+            "assetBytes": 186255,
+            "runtimeGzip": 24240,
+            "totalGzip": 210924,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 40.86662115958772,
+            "textureBytes": 3147520,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 15.03836576415218,
+              "minPsnr": 12.628398609274429
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "xuastc-watch/model.i3d",
+            "assetBytes": 248241,
+            "runtimeGzip": 175022,
+            "totalGzip": 423696,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 42.31256725118463,
+            "textureBytes": 2361088,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 15.03836576415218,
+              "minPsnr": 12.628398609274429
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/watch/512/model.json",
+            "assetBytes": 386104,
+            "totalGzip": 386956,
+            "codecPsnr": 33.657578225919465,
+            "imageBytes": 33554432,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/watch/512",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 12049.1875
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "baked-watch/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.9202486635543408,
+          "meanPsnr": 14.69088215178747
+        }
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "matrix/watch/1024/pbr/model.i3d",
+            "assetBytes": 688393,
+            "runtimeGzip": 24240,
+            "totalGzip": 713063,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 41.47390234421617,
+            "textureBytes": 18876160,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/watch/1024/pbr-xuastc/model.i3d",
+            "assetBytes": 714297,
+            "runtimeGzip": 175022,
+            "totalGzip": 889752,
+            "codec": "xuastc",
+            "quality": 100,
+            "block": "6x6",
+            "codecPsnr": 41.21155178640984,
+            "textureBytes": 15149712,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/watch/1024/baked/model.i3d",
+            "assetBytes": 529021,
+            "runtimeGzip": 24240,
+            "totalGzip": 553691,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 42.926162093850884,
+            "textureBytes": 12584704,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 15.254792634412825,
+              "minPsnr": 12.324523590261279
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/watch/1024/baked-xuastc/model.i3d",
+            "assetBytes": 744566,
+            "runtimeGzip": 175022,
+            "totalGzip": 920022,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 44.577709475788375,
+            "textureBytes": 9438976,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 15.254792634412825,
+              "minPsnr": 12.324523590261279
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/watch/1024/model.json",
+            "assetBytes": 939995,
+            "totalGzip": 940846,
+            "codecPsnr": 35.63739185760269,
+            "imageBytes": 134217728,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/watch/1024",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 29358.25
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/watch/1024/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.9633152861407681,
+          "meanPsnr": 15.07179733900866
+        }
+      }
+    ]
+  },
+  {
+    "id": "decor",
+    "label": "Decor",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "matrix/decor/512/pbr/model.i3d",
+            "assetBytes": 335031,
+            "runtimeGzip": 24240,
+            "totalGzip": 359701,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 42.264863282470095,
+            "textureBytes": 4720384,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/decor/512/pbr-xuastc/model.i3d",
+            "assetBytes": 366270,
+            "runtimeGzip": 175022,
+            "totalGzip": 541726,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 41.47324853314907,
+            "textureBytes": 3933952,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/decor/512/baked/model.i3d",
+            "assetBytes": 203982,
+            "runtimeGzip": 24240,
+            "totalGzip": 228652,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 42.40753525925498,
+            "textureBytes": 3147520,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 23.600711176054077,
+              "minPsnr": 20.351078509956913
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/decor/512/baked-xuastc/model.i3d",
+            "assetBytes": 265306,
+            "runtimeGzip": 175022,
+            "totalGzip": 440761,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 43.36941793512934,
+            "textureBytes": 2361088,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 23.600711176054077,
+              "minPsnr": 20.351078509956913
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/decor/512/model.json",
+            "assetBytes": 184424,
+            "totalGzip": 185276,
+            "codecPsnr": 35.53648251709966,
+            "imageBytes": 33554432,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/decor/512",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 5746.6875
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/decor/512/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.8898552791045841,
+          "meanPsnr": 23.29531312730145
+        }
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "matrix/decor/1024/pbr/model.i3d",
+            "assetBytes": 987742,
+            "runtimeGzip": 24240,
+            "totalGzip": 1012413,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 44.45979547314738,
+            "textureBytes": 18876160,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/decor/1024/pbr-xuastc/model.i3d",
+            "assetBytes": 995445,
+            "runtimeGzip": 175022,
+            "totalGzip": 1170900,
+            "codec": "xuastc",
+            "quality": 90,
+            "block": "6x6",
+            "codecPsnr": 42.107103661292314,
+            "textureBytes": 15149712,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/decor/1024/baked/model.i3d",
+            "assetBytes": 600782,
+            "runtimeGzip": 24240,
+            "totalGzip": 625452,
+            "codec": "avif",
+            "quality": 65,
+            "codecPsnr": 40.317051085222275,
+            "textureBytes": 12584704,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 25.877873591181302,
+              "minPsnr": 22.53303062966337
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/decor/1024/baked-xuastc/model.i3d",
+            "assetBytes": 718756,
+            "runtimeGzip": 175022,
+            "totalGzip": 894211,
+            "codec": "xuastc",
+            "quality": 90,
+            "block": "6x6",
+            "codecPsnr": 40.44408426703456,
+            "textureBytes": 8858256,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 25.877873591181302,
+              "minPsnr": 22.53303062966337
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/decor/1024/model.json",
+            "assetBytes": 464831,
+            "totalGzip": 465682,
+            "codecPsnr": 37.125852853115,
+            "imageBytes": 134217728,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/decor/1024",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 14509.375
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/decor/1024/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.9378851645874042,
+          "meanPsnr": 25.45195400862946
+        }
+      }
+    ]
+  },
+  {
+    "id": "motorcycle",
+    "label": "Motorcycle",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "matrix/motorcycle/512/pbr/model.i3d",
+            "assetBytes": 432083,
+            "runtimeGzip": 24240,
+            "totalGzip": 456753,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 43.333027020850594,
+            "textureBytes": 5768736,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/motorcycle/512/pbr-xuastc/model.i3d",
+            "assetBytes": 408410,
+            "runtimeGzip": 175022,
+            "totalGzip": 583865,
+            "codec": "xuastc",
+            "quality": 90,
+            "block": "6x6",
+            "codecPsnr": 40.28483428192345,
+            "textureBytes": 3906880,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/motorcycle/512/baked/model.i3d",
+            "assetBytes": 297174,
+            "runtimeGzip": 24240,
+            "totalGzip": 321845,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 47.31108922373881,
+            "textureBytes": 3147296,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 15.940247200243334,
+              "minPsnr": 14.12657650596546
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/motorcycle/512/baked-xuastc/model.i3d",
+            "assetBytes": 309316,
+            "runtimeGzip": 175022,
+            "totalGzip": 484771,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 41.090438123379904,
+            "textureBytes": 2360864,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 15.940247200243334,
+              "minPsnr": 14.12657650596546
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/motorcycle/512/model.json",
+            "assetBytes": 240382,
+            "totalGzip": 241234,
+            "codecPsnr": 29.743509676030598,
+            "imageBytes": 33554432,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/motorcycle/512",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 7495.375
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/motorcycle/512/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.9343386059447245,
+          "meanPsnr": 15.772944664698912
+        }
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "matrix/motorcycle/1024/pbr/model.i3d",
+            "assetBytes": 1243478,
+            "runtimeGzip": 24240,
+            "totalGzip": 1268149,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 45.15116473735504,
+            "textureBytes": 23070240,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/motorcycle/1024/pbr-xuastc/model.i3d",
+            "assetBytes": 1244899,
+            "runtimeGzip": 175022,
+            "totalGzip": 1420354,
+            "codec": "xuastc",
+            "quality": 90,
+            "block": "8x6",
+            "codecPsnr": 40.84607935255043,
+            "textureBytes": 15382048,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/motorcycle/1024/baked/model.i3d",
+            "assetBytes": 815967,
+            "runtimeGzip": 24240,
+            "totalGzip": 840637,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 41.323022481375716,
+            "textureBytes": 12584480,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 16.23509016498605,
+              "minPsnr": 14.27661335937316
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/motorcycle/1024/baked-xuastc/model.i3d",
+            "assetBytes": 1016114,
+            "runtimeGzip": 175022,
+            "totalGzip": 1191569,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 42.69109068042176,
+            "textureBytes": 9438752,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 16.23509016498605,
+              "minPsnr": 14.27661335937316
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/motorcycle/1024/model.json",
+            "assetBytes": 638915,
+            "totalGzip": 639766,
+            "codecPsnr": 31.72780564570582,
+            "imageBytes": 134217728,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/motorcycle/1024",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 19949.5
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/motorcycle/1024/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.9660513282305268,
+          "meanPsnr": 16.185548823687768
+        }
+      }
+    ]
+  },
+  {
+    "id": "boat",
+    "label": "Viking boat",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "matrix/boat/512/pbr/model.i3d",
+            "assetBytes": 381886,
+            "runtimeGzip": 24240,
+            "totalGzip": 406556,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 44.409154316080304,
+            "textureBytes": 4720384,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/boat/512/pbr-xuastc/model.i3d",
+            "assetBytes": 369216,
+            "runtimeGzip": 175022,
+            "totalGzip": 544671,
+            "codec": "xuastc",
+            "quality": 90,
+            "block": "6x6",
+            "codecPsnr": 41.19792284150475,
+            "textureBytes": 3790144,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/boat/512/baked/model.i3d",
+            "assetBytes": 180999,
+            "runtimeGzip": 24240,
+            "totalGzip": 205668,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 41.37356596772769,
+            "textureBytes": 3147520,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 20.344349210734325,
+              "minPsnr": 16.154839503448674
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/boat/512/baked-xuastc/model.i3d",
+            "assetBytes": 236537,
+            "runtimeGzip": 175022,
+            "totalGzip": 411993,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 41.62796845183462,
+            "textureBytes": 2361088,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 20.344349210734325,
+              "minPsnr": 16.154839503448674
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/boat/512/model.json",
+            "assetBytes": 179598,
+            "totalGzip": 180450,
+            "codecPsnr": 33.21322300277459,
+            "imageBytes": 33554432,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/boat/512",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 5595.875
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/boat/512/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.8091091245376079,
+          "meanPsnr": 19.625442406400328
+        }
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "matrix/boat/1024/pbr/model.i3d",
+            "assetBytes": 887353,
+            "runtimeGzip": 24240,
+            "totalGzip": 912023,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 41.2516699902908,
+            "textureBytes": 18876160,
+            "textureFormat": "rgba",
+            "lighting": null
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light \u2013 XUASTC",
+            "src": "matrix/boat/1024/pbr-xuastc/model.i3d",
+            "assetBytes": 958008,
+            "runtimeGzip": 175022,
+            "totalGzip": 1133463,
+            "codec": "xuastc",
+            "quality": 90,
+            "block": "6x6",
+            "codecPsnr": 40.343633645507,
+            "textureBytes": 15149712,
+            "textureFormat": "astc",
+            "lighting": null
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "matrix/boat/1024/baked/model.i3d",
+            "assetBytes": 558975,
+            "runtimeGzip": 24240,
+            "totalGzip": 583643,
+            "codec": "avif",
+            "quality": 80,
+            "codecPsnr": 42.208523938038915,
+            "textureBytes": 12584704,
+            "textureFormat": "rgba",
+            "lighting": {
+              "meanPsnr": 21.780401655483274,
+              "minPsnr": 17.645947236030455
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio \u2013 XUASTC",
+            "src": "matrix/boat/1024/baked-xuastc/model.i3d",
+            "assetBytes": 746068,
+            "runtimeGzip": 175022,
+            "totalGzip": 921524,
+            "codec": "xuastc",
+            "quality": 85,
+            "block": "4x4",
+            "codecPsnr": 42.356738811253855,
+            "textureBytes": 9438976,
+            "textureFormat": "astc",
+            "lighting": {
+              "meanPsnr": 21.780401655483274,
+              "minPsnr": 17.645947236030455
+            }
+          },
+          {
+            "id": "webp",
+            "name": "32 WebP views",
+            "src": "turntable/boat/1024/model.json",
+            "assetBytes": 508777,
+            "totalGzip": 509628,
+            "codecPsnr": 33.90986414311003,
+            "imageBytes": 134217728,
+            "codec": "webp",
+            "quality": 80
+          }
+        ],
+        "turntable": {
+          "folder": "turntable/boat/1024",
+          "pitch": 0.2,
+          "distance": 4,
+          "frames": 32,
+          "meanFrameBytes": 15882.6875
+        },
+        "views": [
+          [
+            0,
+            0.15
+          ],
+          [
+            0.5235987755982988,
+            0.15
+          ],
+          [
+            1.0471975511965976,
+            0.15
+          ],
+          [
+            1.5707963267948966,
+            0.15
+          ],
+          [
+            2.0943951023931953,
+            0.15
+          ],
+          [
+            2.6179938779914944,
+            0.15
+          ],
+          [
+            3.141592653589793,
+            0.15
+          ],
+          [
+            3.665191429188092,
+            0.15
+          ],
+          [
+            4.1887902047863905,
+            0.15
+          ],
+          [
+            4.71238898038469,
+            0.15
+          ],
+          [
+            5.235987755982989,
+            0.15
+          ],
+          [
+            5.759586531581287,
+            0.15
+          ],
+          [
+            0,
+            0.6
+          ],
+          [
+            0.5235987755982988,
+            0.6
+          ],
+          [
+            1.0471975511965976,
+            0.6
+          ],
+          [
+            1.5707963267948966,
+            0.6
+          ],
+          [
+            2.0943951023931953,
+            0.6
+          ],
+          [
+            2.6179938779914944,
+            0.6
+          ],
+          [
+            3.141592653589793,
+            0.6
+          ],
+          [
+            3.665191429188092,
+            0.6
+          ],
+          [
+            4.1887902047863905,
+            0.6
+          ],
+          [
+            4.71238898038469,
+            0.6
+          ],
+          [
+            5.235987755982989,
+            0.6
+          ],
+          [
+            5.759586531581287,
+            0.6
+          ],
+          [
+            0,
+            -0.25
+          ],
+          [
+            0.5235987755982988,
+            -0.25
+          ],
+          [
+            1.0471975511965976,
+            -0.25
+          ],
+          [
+            1.5707963267948966,
+            -0.25
+          ],
+          [
+            2.0943951023931953,
+            -0.25
+          ],
+          [
+            2.6179938779914944,
+            -0.25
+          ],
+          [
+            3.141592653589793,
+            -0.25
+          ],
+          [
+            3.665191429188092,
+            -0.25
+          ],
+          [
+            4.1887902047863905,
+            -0.25
+          ],
+          [
+            4.71238898038469,
+            -0.25
+          ],
+          [
+            5.235987755982989,
+            -0.25
+          ],
+          [
+            5.759586531581287,
+            -0.25
+          ]
+        ],
+        "referencePrefix": "matrix/boat/1024/baked/studio-source-",
+        "referenceLabel": "Studio source",
+        "sourceQuality": {
+          "minIoU": 0.8835571026023538,
+          "meanPsnr": 20.985818573750258
+        }
+      }
+    ]
+  }
+]

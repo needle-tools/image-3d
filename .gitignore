@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.local/
+*.tgz
+.DS_Store
+demo/public/index.html
+demo/public/comparison.json
+demo/public/img-3d*.js
+demo/public/grid.js
+demo/public/turntable.js
+demo/public/comparison*.png

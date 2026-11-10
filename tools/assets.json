@@ -1,0 +1,78 @@
+{
+  "sizes": [
+    512,
+    1024
+  ],
+  "models": [
+    {
+      "id": "owl",
+      "label": "Owl",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/owl-512.glb",
+          "sha256": "619936e85115f7513d62b1e962895eb70f5420fd3ae468de029be0a7ee4a02ca"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/owl-1024.glb",
+          "sha256": "41a37fe9dd8d5b63f61379c051d96f0df2783c02e864e4329d214da19c41350b"
+        }
+      }
+    },
+    {
+      "id": "watch",
+      "label": "Watch",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/watch-512.glb",
+          "sha256": "63ea8b858d9cf16c4ce7e99b938dcf8f5517f8e56e24b315f34b1913e92d6365"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/watch-1024.glb",
+          "sha256": "8d90ede192b9fd39087d6598dea8d009c18764cb686b9efb0e6b708af32979f9"
+        }
+      }
+    },
+    {
+      "id": "decor",
+      "label": "Decor",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/decor-512.glb",
+          "sha256": "7f4879f127624e7faf874de622cd9a72342f5af724b3dc0fcde9a81d5e1f0da0"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/decor-1024.glb",
+          "sha256": "9aad3b2f9409ab27b6dd129d6f6bdf9c5ca8993ac8287a1c873085055a987470"
+        }
+      }
+    },
+    {
+      "id": "motorcycle",
+      "label": "Motorcycle",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/motorcycle-512.glb",
+          "sha256": "6c9e2f2e2dc155261ca501063cd649c8b9b163dbbb4e69bb7a8be60d344a1394"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/motorcycle-1024.glb",
+          "sha256": "e038bd0392d88c237e3dd3079f987ef5466daad59465de123d624f4f697e4803"
+        }
+      }
+    },
+    {
+      "id": "boat",
+      "label": "Viking boat",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/boat-512.glb",
+          "sha256": "4bab5f7139a2bff629fdbf690afbd144a7eefb8c54f8a4dabc079a5338882858"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/boat-1024.glb",
+          "sha256": "f4a5759dd1d2cee61243351d530ad825ec550ce7d407feaa42caa16070ff5100"
+        }
+      }
+    }
+  ]
+}

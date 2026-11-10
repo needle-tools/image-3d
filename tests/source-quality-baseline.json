@@ -1,0 +1,377 @@
+{
+ "provenance": "Scores of the img-3d runtime before the WebGPU renderer (runtime SHA-256 8ecb02a65ec3c3fb561e70488f34874a8cac76d661a3e0e3e7378008a01a4450). Captures and studio references come from matrix.mjs, which builds them from the checksum-pinned sources in assets.json (.local/img-3d/comparison.json). Metrics: src/impostor/impostor-quality.js; views 0,1,14,30; card = 82 CSS px at DPR 2, view = 512 CSS px at DPR 1.",
+ "tolerance": {
+  "iou": 0.003,
+  "boundaryPx": 0.15,
+  "bakedPsnrDb": 1.0
+ },
+ "views": [
+  0,
+  1,
+  14,
+  30
+ ],
+ "rows": [
+  {
+   "mode": "view",
+   "model": "owl",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9703,
+   "boundaryMeanPx": 0.8867,
+   "unionPsnr": 17.8487
+  },
+  {
+   "mode": "view",
+   "model": "owl",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9703,
+   "boundaryMeanPx": 0.8867,
+   "unionPsnr": 15.5197
+  },
+  {
+   "mode": "view",
+   "model": "owl",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9888,
+   "boundaryMeanPx": 0.3641,
+   "unionPsnr": 20.0428
+  },
+  {
+   "mode": "view",
+   "model": "owl",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9888,
+   "boundaryMeanPx": 0.3641,
+   "unionPsnr": 16.2052
+  },
+  {
+   "mode": "view",
+   "model": "watch",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9731,
+   "boundaryMeanPx": 1.5511,
+   "unionPsnr": 13.8269
+  },
+  {
+   "mode": "view",
+   "model": "watch",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9731,
+   "boundaryMeanPx": 1.5511,
+   "unionPsnr": 11.5713
+  },
+  {
+   "mode": "view",
+   "model": "watch",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9884,
+   "boundaryMeanPx": 0.597,
+   "unionPsnr": 14.9233
+  },
+  {
+   "mode": "view",
+   "model": "watch",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9884,
+   "boundaryMeanPx": 0.597,
+   "unionPsnr": 11.77
+  },
+  {
+   "mode": "view",
+   "model": "decor",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9489,
+   "boundaryMeanPx": 2.5393,
+   "unionPsnr": 16.1509
+  },
+  {
+   "mode": "view",
+   "model": "decor",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9489,
+   "boundaryMeanPx": 2.5393,
+   "unionPsnr": 12.1296
+  },
+  {
+   "mode": "view",
+   "model": "decor",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9708,
+   "boundaryMeanPx": 1.3897,
+   "unionPsnr": 18.8555
+  },
+  {
+   "mode": "view",
+   "model": "decor",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9708,
+   "boundaryMeanPx": 1.3897,
+   "unionPsnr": 12.5593
+  },
+  {
+   "mode": "view",
+   "model": "motorcycle",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9523,
+   "boundaryMeanPx": 1.008,
+   "unionPsnr": 14.3725
+  },
+  {
+   "mode": "view",
+   "model": "motorcycle",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9523,
+   "boundaryMeanPx": 1.008,
+   "unionPsnr": 13.167
+  },
+  {
+   "mode": "view",
+   "model": "motorcycle",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.978,
+   "boundaryMeanPx": 0.6297,
+   "unionPsnr": 15.7617
+  },
+  {
+   "mode": "view",
+   "model": "motorcycle",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.978,
+   "boundaryMeanPx": 0.6297,
+   "unionPsnr": 13.584
+  },
+  {
+   "mode": "view",
+   "model": "boat",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9443,
+   "boundaryMeanPx": 1.3753,
+   "unionPsnr": 17.9913
+  },
+  {
+   "mode": "view",
+   "model": "boat",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9443,
+   "boundaryMeanPx": 1.3753,
+   "unionPsnr": 12.251
+  },
+  {
+   "mode": "view",
+   "model": "boat",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9683,
+   "boundaryMeanPx": 0.8531,
+   "unionPsnr": 20.2808
+  },
+  {
+   "mode": "view",
+   "model": "boat",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9683,
+   "boundaryMeanPx": 0.8531,
+   "unionPsnr": 12.4959
+  },
+  {
+   "mode": "card",
+   "model": "owl",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9713,
+   "boundaryMeanPx": 0.259,
+   "unionPsnr": 20.5907
+  },
+  {
+   "mode": "card",
+   "model": "owl",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9713,
+   "boundaryMeanPx": 0.259,
+   "unionPsnr": 16.51
+  },
+  {
+   "mode": "card",
+   "model": "owl",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9883,
+   "boundaryMeanPx": 0.1143,
+   "unionPsnr": 20.3174
+  },
+  {
+   "mode": "card",
+   "model": "owl",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9883,
+   "boundaryMeanPx": 0.1143,
+   "unionPsnr": 16.6417
+  },
+  {
+   "mode": "card",
+   "model": "watch",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9711,
+   "boundaryMeanPx": 0.4887,
+   "unionPsnr": 15.0209
+  },
+  {
+   "mode": "card",
+   "model": "watch",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9711,
+   "boundaryMeanPx": 0.4887,
+   "unionPsnr": 12.0373
+  },
+  {
+   "mode": "card",
+   "model": "watch",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9854,
+   "boundaryMeanPx": 0.2527,
+   "unionPsnr": 15.4228
+  },
+  {
+   "mode": "card",
+   "model": "watch",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9854,
+   "boundaryMeanPx": 0.2527,
+   "unionPsnr": 12.1315
+  },
+  {
+   "mode": "card",
+   "model": "decor",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9544,
+   "boundaryMeanPx": 0.6537,
+   "unionPsnr": 22.6794
+  },
+  {
+   "mode": "card",
+   "model": "decor",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9544,
+   "boundaryMeanPx": 0.6537,
+   "unionPsnr": 12.5636
+  },
+  {
+   "mode": "card",
+   "model": "decor",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9765,
+   "boundaryMeanPx": 0.3126,
+   "unionPsnr": 25.4245
+  },
+  {
+   "mode": "card",
+   "model": "decor",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9765,
+   "boundaryMeanPx": 0.3126,
+   "unionPsnr": 12.7669
+  },
+  {
+   "mode": "card",
+   "model": "motorcycle",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9531,
+   "boundaryMeanPx": 0.3803,
+   "unionPsnr": 17.214
+  },
+  {
+   "mode": "card",
+   "model": "motorcycle",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9531,
+   "boundaryMeanPx": 0.3803,
+   "unionPsnr": 14.1192
+  },
+  {
+   "mode": "card",
+   "model": "motorcycle",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9755,
+   "boundaryMeanPx": 0.2005,
+   "unionPsnr": 17.1679
+  },
+  {
+   "mode": "card",
+   "model": "motorcycle",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9755,
+   "boundaryMeanPx": 0.2005,
+   "unionPsnr": 14.2281
+  },
+  {
+   "mode": "card",
+   "model": "boat",
+   "size": 512,
+   "appearance": "baked",
+   "meanIoU": 0.9442,
+   "boundaryMeanPx": 0.5687,
+   "unionPsnr": 20.9782
+  },
+  {
+   "mode": "card",
+   "model": "boat",
+   "size": 512,
+   "appearance": "pbr",
+   "meanIoU": 0.9442,
+   "boundaryMeanPx": 0.5687,
+   "unionPsnr": 12.6313
+  },
+  {
+   "mode": "card",
+   "model": "boat",
+   "size": 1024,
+   "appearance": "baked",
+   "meanIoU": 0.9662,
+   "boundaryMeanPx": 0.3643,
+   "unionPsnr": 21.7362
+  },
+  {
+   "mode": "card",
+   "model": "boat",
+   "size": 1024,
+   "appearance": "pbr",
+   "meanIoU": 0.9662,
+   "boundaryMeanPx": 0.3643,
+   "unionPsnr": 12.7082
+  }
+ ],
+ "toleranceRationale": "Allowances cover rendering differences between the renderers, not regressions: 0.003 IoU is about one silhouette pixel per 82-px card edge; 0.15 px boundary is below one pixel; 1 dB baked PSNR admits the measured decor 1024 card result (0.56 dB below the previous renderer) while catching larger appearance changes. PBR PSNR is not gated: the references use studio lighting, not the viewer light."
+}

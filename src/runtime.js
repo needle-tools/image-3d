@@ -1,0 +1,677 @@
+import {surfaceCrossingGlsl} from './surface-shader.js';
+// MIT. A standalone bundle: no runtime imports, engine or external image decoder.
+const vertex = `#version 300 es
+precision highp float;
+uniform sampler2D boxes;
+uniform vec3 eye, right, up, forward;
+uniform float aspect, focal;
+uniform int offset;
+flat out int id;
+out vec3 world;
+out vec2 carrierUv;
+invariant gl_Position;
+invariant world;
+invariant carrierUv;
+vec4 box(int i){return texelFetch(boxes,ivec2(i,id),0);}
+void main(){
+ id=gl_InstanceID+offset;
+ // Six outward-wound faces, two triangles each.
+ int f=gl_VertexID/6,k=gl_VertexID%6,a=f/2;
+ float s=f%2==0?1.:-1.;
+ vec2 q=vec2(k==0||k==3||k==5?-1.:1.,k<2||k==3?-1.:1.);
+ vec3 n=vec3(a==0?s:0.,a==1?s:0.,a==2?s:0.);
+ vec3 r=a==0?vec3(0,0,-s):a==1?vec3(1,0,0):vec3(s,0,0);
+ vec3 u=a==1?vec3(0,0,-s):vec3(0,1,0);
+ carrierUv=q;
+ mat3 basis=mat3(box(2).xyz,box(3).xyz,box(4).xyz);
+ world=box(0).xyz+basis*((n+r*q.x+u*q.y)*box(1).xyz);
+ vec3 p=world-eye;
+ float z=dot(p,forward), near=.01,far=100.;
+ gl_Position=vec4(dot(p,right)*focal/aspect,dot(p,up)*focal,(far+near)/(far-near)*z-2.*far*near/(far-near),z);
+}`;
+const fragment = `#version 300 es
+precision highp float;
+precision highp int;
+uniform sampler2D boxes, colorMap, geometryMap, shadingMap;
+uniform highp sampler2D hitMap, hitDepth;
+uniform int batchId;
+uniform bool cacheInput, cacheOutput;
+uniform ivec2 origin;
+uniform vec3 eye, forward;
+uniform vec3 lightDirection;
+uniform float lightIntensity, ambientIntensity;
+uniform float size, cutoff;
+uniform bool emission, blended;
+flat in int id;
+in vec3 world;
+in vec2 carrierUv;
+out vec4 outputColor;
+vec4 box(int i){return texelFetch(boxes,ivec2(i,id),0);}
+vec2 uvAt(vec3 p,vec3 r,vec3 u,vec4 rect){return (rect.xy+clamp(vec2(dot(p,r),dot(p,u))*.5+.5,0.,1.)*rect.zw)/size;}
+float depthAt(vec2 uv){vec2 d=textureLod(geometryMap,vec2(uv.x*.5,uv.y),0.).rg;return dot(d,vec2(65280.,255.))/65535.;}
+// Hoist the affine ray projection out of every depth lookup.
+vec2 uvOrigin,uvVelocity,uvLow,uvHigh;float planeOrigin,planeVelocity;
+float fieldAt(float t){return planeOrigin+planeVelocity*t+2.*depthAt(clamp(uvOrigin+uvVelocity*t,uvLow,uvHigh));}
+vec3 oct(vec2 v){vec3 n=vec3(v*2.-1.,1.-abs(v.x*2.-1.)-abs(v.y*2.-1.));if(n.z<0.)n.xy=(1.-abs(n.yx))*sign(n.xy+1e-20);return normalize(n);}
+float channel(vec2 uv,int i){return texture(shadingMap,(uv+vec2(i%3,i/3))/vec2(3,2)).r;}
+vec3 srgb(vec3 c){return mix(c*12.92,1.055*pow(max(c,0.),vec3(1./2.4))-.055,step(vec3(.0031308),c));}
+void main(){
+ vec2 edge=(1.-abs(carrierUv))/(fwidth(carrierUv)+1e-6);
+ float diagonal=carrierUv.x-carrierUv.y;
+ bool interior=min(edge.x,edge.y)>1.&&abs(diagonal)/(fwidth(diagonal)+1e-6)>1.;
+ mat3 basis=mat3(box(2).xyz,box(3).xyz,box(4).xyz), inv=inverse(basis);
+ vec3 halfSize=box(1).xyz, o=(inv*(eye-box(0).xyz))/halfSize;
+ vec3 ray=normalize(world-eye),r=(inv*ray)/halfSize;
+ vec3 safe=sign(r+1e-20)*max(abs(r),1e-9);
+ vec3 t0=(-1.-o)/safe,t1=(1.-o)/safe;
+ vec3 low=min(t0,t1),high=max(t0,t1);
+ float enter=max(0.,max(low.x,max(low.y,low.z))),exit=min(high.x,min(high.y,high.z));
+ if(exit<enter)discard;
+ float best=exit+1.;vec2 hitUv=vec2(0);vec3 hitNormal=vec3(0);bool found=false;int hitFace=0;
+ bool reuse=false;
+ vec4 remembered=vec4(0);
+ #ifdef REUSE
+ {
+ ivec2 pixel=(ivec2(gl_FragCoord.xy)-origin);
+ remembered=texelFetch(hitMap,pixel,0);
+ if(interior&&remembered.w==0.)discard;
+ reuse=interior&&remembered.w>0.;
+ if(reuse){
+  if(int(remembered.w)!=id+1||int(remembered.z)/6!=batchId)discard;
+  hitUv=remembered.xy;hitFace=int(remembered.z)%6;found=true;
+ }else if(remembered.w>0.){
+  // An opaque interior owner covers every sample. Keep target-depth ties and
+  // projection roundoff; a far-plane tie provides no finite upper bound.
+  float depth=texelFetch(hitDepth,pixel,0).r+2./16777215.;
+  if(depth<1.){
+   float limit=1./((100.-99.99*depth)*dot(ray,forward));
+   best=min(best,limit+abs(limit)*2e-5+1e-6);
+   if(enter>best)discard;
+  }
+ }
+ }
+ #endif
+ #ifdef BAKED
+ vec3 radiance=vec3(0);float weights=0.;
+ #endif
+ if(!reuse){
+ #ifndef BAKED
+ vec3 look=inv*ray;
+ vec3 angles=abs(look)/vec3(length(vec3(inv[0].x,inv[1].x,inv[2].x)),length(vec3(inv[0].y,inv[1].y,inv[2].y)),length(vec3(inv[0].z,inv[1].z,inv[2].z)));
+ int major=angles.x>=angles.y&&angles.x>=angles.z?0:angles.y>=angles.z?1:2;
+ int a1=(major+1)%3,a2=(major+2)%3,second=angles[a1]>=angles[a2]?a1:a2,third=3-major-second;
+ #endif
+ for(int pass=0;pass<6;pass++){
+ #ifdef BAKED
+ int face=pass;
+ #else
+ int rank=pass%3,sortedAxis=rank==0?major:rank==1?second:third;
+ int face=sortedAxis*2+int(look[sortedAxis]>0.);if(pass>=3)face^=1;
+ #endif
+  int axis=face/2;float signN=face%2==0?1.:-1.;
+  vec3 n=vec3(axis==0?signN:0.,axis==1?signN:0.,axis==2?signN:0.);
+  vec3 right=axis==0?vec3(0,0,-signN):axis==1?vec3(1,0,0):vec3(signN,0,0);
+  vec3 up=axis==1?vec3(0,0,-signN):vec3(0,1,0);
+  vec4 rect=box(5+face),bounds=box(11+face/2);
+  vec2 limits=face%2==0?bounds.xy:bounds.zw;
+  float denom=dot(r,n);if(abs(denom)<1e-8)continue;
+  vec2 interval=(1.-2.*limits/65535.-dot(o,n))/denom;
+  float start=max(enter,min(interval.x,interval.y)),end=min(exit,max(interval.x,interval.y));
+  // Quantization bounds enclose captured depths; include one depth quantum.
+  start=max(enter,start-4./65535./abs(denom));end=min(exit,end+4./65535./abs(denom));
+  if(end<start)continue;
+  #ifndef BAKED
+  if(start>best)continue;
+  #endif
+  uvOrigin=(rect.xy+(vec2(dot(o,right),dot(o,up))*.5+.5)*rect.zw)/size;
+  uvVelocity=vec2(dot(r,right),dot(r,up))*.5*rect.zw/size;uvLow=rect.xy/size;uvHigh=(rect.xy+rect.zw)/size;
+  planeOrigin=dot(o,n)-1.;planeVelocity=denom;
+  float previous=start,prev=fieldAt(start);
+  vec2 span=abs(vec2(dot(r,right),dot(r,up)))*rect.zw*.5*(end-start);
+  int count=int(ceil(max(24.,2.*max(span.x,span.y))));
+  // Keep the original sample grid and refinement. Independent texture reads
+  // run together; the bit mask visits only crossing intervals, in ray order.
+  bool faceDone=false;
+  for(int step=0;step<=count;step+=16){
+   #ifndef BAKED
+   if(previous>best)break;
+   #endif
+   vec4 d0,d1,d2,d3;
+   d0.x=fieldAt(mix(start,end,float(min(count,step+0))/float(count)));
+   d0.y=fieldAt(mix(start,end,float(min(count,step+1))/float(count)));
+   d0.z=fieldAt(mix(start,end,float(min(count,step+2))/float(count)));
+   d0.w=fieldAt(mix(start,end,float(min(count,step+3))/float(count)));
+   d1.x=fieldAt(mix(start,end,float(min(count,step+4))/float(count)));
+   d1.y=fieldAt(mix(start,end,float(min(count,step+5))/float(count)));
+   d1.z=fieldAt(mix(start,end,float(min(count,step+6))/float(count)));
+   d1.w=fieldAt(mix(start,end,float(min(count,step+7))/float(count)));
+   d2.x=fieldAt(mix(start,end,float(min(count,step+8))/float(count)));
+   d2.y=fieldAt(mix(start,end,float(min(count,step+9))/float(count)));
+   d2.z=fieldAt(mix(start,end,float(min(count,step+10))/float(count)));
+   d2.w=fieldAt(mix(start,end,float(min(count,step+11))/float(count)));
+   d3.x=fieldAt(mix(start,end,float(min(count,step+12))/float(count)));
+   d3.y=fieldAt(mix(start,end,float(min(count,step+13))/float(count)));
+   d3.z=fieldAt(mix(start,end,float(min(count,step+14))/float(count)));
+   d3.w=fieldAt(mix(start,end,float(min(count,step+15))/float(count)));
+   bvec4 c0=lessThanEqual(d0*vec4(prev,d0.xyz),vec4(0));
+   bvec4 c1=lessThanEqual(d1*vec4(d0.w,d1.xyz),vec4(0));
+   bvec4 c2=lessThanEqual(d2*vec4(d1.w,d2.xyz),vec4(0));
+   bvec4 c3=lessThanEqual(d3*vec4(d2.w,d3.xyz),vec4(0));
+   uint crossings=(uint(c0.x)<<0u)|(uint(c0.y)<<1u)|(uint(c0.z)<<2u)|(uint(c0.w)<<3u)|(uint(c1.x)<<4u)|(uint(c1.y)<<5u)|(uint(c1.z)<<6u)|(uint(c1.w)<<7u)|(uint(c2.x)<<8u)|(uint(c2.y)<<9u)|(uint(c2.z)<<10u)|(uint(c2.w)<<11u)|(uint(c3.x)<<12u)|(uint(c3.y)<<13u)|(uint(c3.z)<<14u)|(uint(c3.w)<<15u);
+   if(step==0)crossings|=1u;
+   crossings&=(1u<<uint(min(16,count-step+1)))-1u;
+   float incoming=prev;
+   while(crossings!=0u){uint bit=crossings&(~crossings+1u);crossings&=crossings-1u;
+    // Decode the isolated low bit without an ES 3.1 findLSB dependency.
+    int lane=int((bit&0xaaaau)!=0u)+2*int((bit&0xccccu)!=0u)+4*int((bit&0xf0f0u)!=0u)+8*int((bit&0xff00u)!=0u);
+    int index=step+lane;
+    previous=mix(start,end,float(max(0,index-1))/float(count));
+    int before=(lane-1)&3;
+    prev=lane==0?incoming:lane<5?d0[before]:lane<9?d1[before]:lane<13?d2[before]:d3[before];
+    #ifndef BAKED
+    if(previous>best){faceDone=true;break;}
+    #endif
+    float t=mix(start,end,float(index)/float(count)),d=lane<4?d0[lane]:lane<8?d1[lane&3]:lane<12?d2[lane&3]:d3[lane&3];
+   if(index==0||d*prev<=0.){
+    ${surfaceCrossingGlsl()}vec3 point=o+r*candidate;
+    vec2 hit=uvAt(point,right,up,rect);
+    vec3 data=texelFetch(geometryMap,ivec2(clamp(hit*size,vec2(0),vec2(size-1.))),0).rgb;
+    float residual=abs(dot(point,n)-(1.-2.*dot(data.rg,vec2(65280.,255.))/65535.));
+    float tolerance=max(dot(abs(right),halfSize)/rect.z,dot(abs(up),halfSize)/rect.w)/dot(abs(n),halfSize)*4.+4./65535.;
+    float opacity=texture(geometryMap,vec2((hit.x+1.)*.5,hit.y)).r;
+    if(data.b>.5&&residual<=tolerance&&opacity>=cutoff){
+     #ifdef BAKED
+     float texelWorld=4.*max(length(basis*(right*halfSize))/rect.z,length(basis*(up*halfSize))/rect.w);
+     if(candidate<best-texelWorld){radiance=vec3(0);weights=0.;}
+     if(candidate<=best+texelWorld){
+      float weight=pow(max(0.,dot(normalize(basis*n),-ray)),4.);
+      float coverage=max(texture(geometryMap,vec2(hit.x*.5,hit.y)).b,1e-8);
+      radiance+=texture(colorMap,hit).rgb/coverage*weight;weights+=weight;
+     }
+     #endif
+     if(candidate<best||(candidate==best&&face<hitFace)){best=candidate;hitUv=hit;hitFace=face;found=true;
+     }
+     #ifndef BAKED
+     faceDone=true;break;
+     #endif
+    }
+   }
+   previous=t;prev=d;
+   }
+   if(faceDone)break;
+   previous=mix(start,end,float(min(count,step+15))/float(count));prev=d3.w;
+  }
+ }
+ }
+ if(!found)discard;
+ float coverage=max(texture(geometryMap,vec2(hitUv.x*.5,hitUv.y)).b,1e-8);
+ vec3 base=texture(colorMap,vec2(hitUv.x/(emission?2.:1.),hitUv.y)).rgb/coverage;
+ #ifdef BAKED
+ outputColor=vec4(srgb(weights>1e-8?radiance/weights:base),blended?texture(geometryMap,vec2((hitUv.x+1.)*.5,hitUv.y)).r:1.);
+ #else
+ #ifdef CACHE
+ {
+ outputColor=vec4(hitUv,float(hitFace+6*batchId),float(id+1)*(interior?1.:-1.));
+ }
+ #else
+ {
+ int axis=hitFace/2;float signN=hitFace%2==0?1.:-1.;
+ vec3 n=vec3(axis==0?signN:0.,axis==1?signN:0.,axis==2?signN:0.);
+ vec3 right=axis==0?vec3(0,0,-signN):axis==1?vec3(1,0,0):vec3(signN,0,0);
+ vec3 up=axis==1?vec3(0,0,-signN):vec3(0,1,0);
+ vec3 normal=oct(vec2(channel(hitUv,0),channel(hitUv,1))/coverage);
+ hitNormal=normalize(transpose(inv)*(right*normal.x+up*normal.y+n*normal.z));
+ if(dot(hitNormal,ray)>0.)hitNormal=-hitNormal;
+ float rough=clamp(channel(hitUv,2)/coverage,.05,1.),metal=clamp(channel(hitUv,4)/coverage,0.,1.);
+ vec3 N=hitNormal,V=-ray,L=normalize(lightDirection),H=normalize(V+L);
+ float nl=max(dot(N,L),0.),nv=max(dot(N,V),.001),nh=max(dot(N,H),0.),vh=max(dot(V,H),0.);
+ float a=rough*rough,a2=a*a,d=a2/(3.141593*pow(nh*nh*(a2-1.)+1.,2.));
+ float k=pow(rough+1.,2.)/8.,g=nv/(nv*(1.-k)+k)*nl/(nl*(1.-k)+k);
+ vec3 f0=mix(vec3(.04),base,metal),F=f0+(1.-f0)*pow(1.-vh,5.);
+ vec3 diffuse=base*(1.-metal);
+ vec3 ambient=mix(vec3(.16,.19,.25),vec3(.68,.73,.8),N.y*.5+.5);
+ vec3 color=ambient*ambientIntensity*(diffuse+f0*.5)*clamp(channel(hitUv,3)/coverage,0.,1.)+(diffuse/3.141593+F*d*g/max(4.*nv*nl,.001))*nl*lightIntensity;
+ if(emission)color+=texture(colorMap,vec2((hitUv.x+1.)*.5,hitUv.y)).rgb/coverage;
+ outputColor=vec4(srgb(color/(1.+color)),blended?texture(geometryMap,vec2((hitUv.x+1.)*.5,hitUv.y)).r:1.);
+ }
+ #endif
+ #endif
+ float z=dot(eye+ray*best-eye,forward);
+ gl_FragDepth=100./99.99-(100.*.01)/(99.99*z);
+ #ifndef BAKED
+ if(reuse)gl_FragDepth=texelFetch(hitDepth,(ivec2(gl_FragCoord.xy)-origin),0).r;
+ #endif
+}`;
+
+const cross = (a,b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const unit = v => { const n=Math.hypot(...v); return v.map(x=>x/n); };
+const numbers=(v,n)=>Array.isArray(v)&&v.length===n&&v.every(Number.isFinite);
+
+// One hidden WebGL surface supplies ordinary 2D canvases. Browser compositing
+// owns scrolling, clipping and stacking; element count never consumes contexts.
+import {createGpu} from './webgpu.js';
+const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
+/** Optional trusted XUASTC entry; capture files never supply executable code. */
+export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
+const elements=new Set(),pending=new Map(),cpu=new Map(),gpu=new Map(),uploads=new Map(),programs=new Map(),lastRendered=new WeakMap();
+const limits={entries:8,cpuBytes:32*1024*1024,gpuBytes:64*1024*1024};
+let surface,gl,depthBits,canCache=false,epoch=0,running=false,renders=0,contexts=0,decodes=0,surfaceBuilds=0,surfaceReuses=0,viewRenders=0;
+const bytes=cache=>[...cache.values()].reduce((sum,r)=>sum+(r.bytes||0),0);
+const touch=(cache,key,value)=>{cache.delete(key);cache.set(key,value);return value;};
+const dispose=r=>{if(r.api)r.api.destroy(r);else for(const t of r.textures)gl?.deleteTexture(t);};
+const activeUrls=()=>new Set([...elements].filter(el=>el.visible&&el.url&&!el.abort?.signal.aborted).map(el=>el.url));
+const inactive=(cache,active)=>new Map([...cache].filter(([url,r])=>!active.has(url)&&!r.waiters?.size));
+function trim(cache,budget,active=activeUrls()){
+ const idle=inactive(cache,active);let count=idle.size,total=bytes(idle);
+ for(const [key,r]of idle){if(count<=limits.entries&&total<=budget)break;cache.delete(key);count--;total-=r.bytes||0;if(cache===gpu)dispose(r);}
+}
+function trimCaches(){const active=activeUrls();trim(cpu,limits.cpuBytes,active);trim(gpu,limits.gpuBytes,active);}
+function cacheCapabilities(){
+ depthBits=gl.getParameter(gl.DEPTH_BITS);
+ // Cache ownership must preserve the destination's depth ties.
+ canCache=!!gl.getExtension('EXT_color_buffer_float')&&[24,32].includes(depthBits);
+}
+// WebGPU is preferred: one shared device renders all elements of a frame into
+// one atlas and copies each element's region into its own WebGPU canvas on the
+// GPU. Without it, one WebGL context renders and 2D canvases copy their region.
+let api=null,choosing=null;
+function backend(){
+ return choosing??=(navigator.gpu?createGpu().catch(error=>{console.warn('img-3d uses WebGL: '+error.message);return null;}):Promise.resolve(null)).then(chosen=>{
+  api=chosen;chosen?.device.lost.then(()=>{
+   if(api!==chosen)return;epoch++;for(const upload of uploads.values())upload.abort.abort();uploads.clear();for(const el of pending.keys())cancel(el);
+   for(const r of gpu.values())r.disposed=true;gpu.clear();api=null;choosing=null;for(const el of elements)enqueue(el);
+  });
+  return chosen;
+ });
+}
+function blank(el){lastRendered.delete(el);if(el.canvasContext)el.canvasContext.clearRect(0,0,el.canvas.width,el.canvas.height);else if(el.gpuContext)el.canvas.width=el.canvas.width;}
+function context(){
+ if(gl)return gl;
+ surface=document.createElement('canvas');gl=surface.getContext('webgl2',{alpha:true,antialias:true});
+ if(!gl)throw Error('WebGL 2 unavailable');contexts++;cacheCapabilities();
+ surface.addEventListener('webglcontextlost',e=>{e.preventDefault();epoch++;for(const upload of uploads.values())upload.abort.abort();uploads.clear();for(const el of pending.keys())cancel(el);for(const el of elements)dropSurface(el);gpu.clear();programs.clear();});
+ surface.addEventListener('webglcontextrestored',()=>{cacheCapabilities();for(const el of elements)enqueue(el);});
+ return gl;
+}
+function clearCaches(){
+ epoch++;for(const upload of uploads.values())upload.abort.abort();uploads.clear();integration.decoder?.dispose();for(const r of cpu.values())r.abort?.abort();cpu.clear();
+ for(const r of gpu.values())dispose(r);gpu.clear();
+ for(const p of programs.values())gl?.deleteProgram(p.program);programs.clear();api?.release();
+}
+function validate(data,max){
+ if(![1,2].includes(data.version)||!data.pages?.length||!data.batches?.length)throw Error('Unsupported img-3d version');
+ const roles=data.appearance==='baked'?2:3;
+ if((data.version===1&&data.appearance!==undefined)||(data.version===2&&data.appearance!=='baked'))throw Error('Unsupported img-3d appearance');
+ if(!Array.isArray(data.images)||data.images.length!==data.pages.length*roles||new Set(data.pages.flatMap(p=>p.images)).size!==data.images.length)throw Error('Invalid img-3d images');
+ for(const p of data.pages)if(!Number.isInteger(p.size)||p.size<1||p.size*roles>max||!numbers(p.images,roles)||!p.images.every(i=>Number.isInteger(i)&&i>=0&&i<data.images.length)||(typeof p.emission!=='boolean'||(roles===2&&p.emission)))throw Error('Invalid img-3d page');
+ for(const b of data.batches){
+  if(!Number.isInteger(b.page)||!data.pages[b.page]||!Array.isArray(b.boxes)||!b.boxes.length||b.boxes.length>max||typeof b.blend!=='boolean'||!Number.isFinite(b.cutoff)||b.cutoff<=0||b.cutoff>=1)throw Error('Invalid img-3d batch');
+  const n=data.pages[b.page].size;
+  for(const box of b.boxes)if(!numbers(box.c,3)||!numbers(box.h,3)||box.h.some(x=>x<=0)||!Array.isArray(box.a)||box.a.length!==3||!box.a.every(a=>numbers(a,3))||Math.abs(cross(box.a[0],box.a[1]).reduce((s,x,k)=>s+x*box.a[2][k],0))<1e-20||!Array.isArray(box.v)||box.v.length!==6||!box.v.every(v=>numbers(v,4)&&v[0]>=0&&v[1]>=0&&v[2]>0&&v[3]>0&&v[0]+v[2]<=n&&v[1]+v[3]<=n)||!numbers(box.d,12)||box.d.some(d=>d<0||d>65535))throw Error('Invalid img-3d box');
+ }
+}
+let fetching=0;const fetchQueue=[];
+async function fetchSlot(signal){
+ if(fetching>=3)await new Promise((resolve,reject)=>{
+  const job=()=>{signal.removeEventListener('abort',cancel);resolve();};
+  const cancel=()=>{const i=fetchQueue.indexOf(job);if(i>=0)fetchQueue.splice(i,1);reject(signal.reason);};
+  fetchQueue.push(job);signal.addEventListener('abort',cancel,{once:true});
+ });
+ else fetching++;
+ if(signal.aborted){if(fetchQueue.length)fetchQueue.shift()();else fetching--;signal.throwIfAborted();}
+ return()=>{if(fetchQueue.length)fetchQueue.shift()();else fetching--;};
+}
+async function source(url,signal){
+ let record=cpu.get(url);
+ if(!record){
+  const abort=new AbortController();record={abort,waiters:new Set(),bytes:0};cpu.set(url,record);
+  record.promise=(async()=>{
+   const release=await fetchSlot(abort.signal);
+   try{
+    const response=await fetch(url,{signal:abort.signal});if(!response.ok)throw Error(`HTTP ${response.status}`);
+    const bytes=new Uint8Array(await response.arrayBuffer());
+    if(String.fromCharCode(...bytes.subarray(0,4))!=='I3D1')throw Error('Unsupported img-3d file');
+    const raw=new Uint8Array(await new Response(new Blob([bytes.subarray(4)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    abort.signal.throwIfAborted();
+    const length=new DataView(raw.buffer).getUint32(0,true);
+    if(length>raw.length-4)throw Error('Invalid img-3d metadata');
+    const data=JSON.parse(new TextDecoder().decode(raw.subarray(4,4+length)));
+    const chosen=await backend();validate(data,chosen?chosen.maxTexture:context().getParameter(gl.MAX_TEXTURE_SIZE));
+    let cursor=4+length;
+    const images=data.images.map(image=>{
+     if(!Number.isSafeInteger(image.bytes)||image.bytes<=0||cursor+image.bytes>raw.length||!['image/png','image/jpeg','image/webp','image/avif','image/ktx2'].includes(image.mime))throw Error('Invalid img-3d image');
+     return {bytes:raw.subarray(cursor,cursor+=image.bytes),mime:image.mime};
+    });
+    if(cursor!==raw.length)throw Error('Unexpected img-3d payload');
+    record.bytes=raw.length;record.ready=true;record.abort=null;
+    trim(cpu,limits.cpuBytes);return {data,images};
+   }finally{release();}
+  })();
+  record.promise.catch(()=>{if(cpu.get(url)===record)cpu.delete(url);});
+ }
+ touch(cpu,url,record);const waiter={};record.waiters.add(waiter);
+ let cancel;
+ try{return await Promise.race([record.promise,new Promise((_,reject)=>{
+  cancel=()=>reject(signal.reason);if(signal.aborted)cancel();else signal.addEventListener('abort',cancel,{once:true});
+ })]);}finally{
+  signal.removeEventListener('abort',cancel);record.waiters.delete(waiter);
+  if(!record.ready&&!record.waiters.size){record.abort?.abort();if(cpu.get(url)===record)cpu.delete(url);}
+  trim(cpu,limits.cpuBytes);
+ }
+}
+async function resource(url,signal){
+ const cached=gpu.get(url);if(cached){signal.throwIfAborted();return touch(gpu,url,cached);}
+ let record=uploads.get(url);
+ if(!record){
+  record={abort:new AbortController(),waiters:new Set()};uploads.set(url,record);
+  record.promise=upload(url,record.abort.signal).then(asset=>{record.ready=true;return asset;}).finally(()=>{if(uploads.get(url)===record)uploads.delete(url);});
+  record.promise.catch(()=>{});
+ }
+ const waiter={};record.waiters.add(waiter);let cancel;
+ try{return await Promise.race([record.promise,new Promise((_,reject)=>{cancel=()=>reject(signal.reason);signal.addEventListener('abort',cancel,{once:true});if(signal.aborted)cancel();})]);}
+ finally{signal.removeEventListener('abort',cancel);record.waiters.delete(waiter);if(!record.ready&&!record.waiters.size){record.abort.abort();if(uploads.get(url)===record)uploads.delete(url);}}
+}
+async function upload(url,signal){
+ const chosen=await backend(),generation=epoch,{data,images}=await source(url,signal),textures=[];let storage=0,textureFormat='rgba',transcodeMilliseconds=0;
+ if(chosen){
+  const changed=()=>{signal.throwIfAborted();if(generation!==epoch||api!==chosen)throw new DOMException('Device changed','AbortError');};
+  const asset=await chosen.upload(data,images,{changed,decoder:integration.decoder});
+  try{changed();}catch(error){chosen.destroy(asset);throw error;}
+  asset.api=chosen;gpu.set(url,asset);trim(gpu,limits.gpuBytes);decodes++;return asset;
+ }
+ try{
+  const g=context();if(g.isContextLost())throw new DOMException('Context lost','AbortError');
+  for(const [index,image]of images.entries()){
+   if(image.mime==='image/ktx2'){
+    const page=data.pages.find(p=>p.images.includes(index));
+    if(page.images[0]!==index||!integration.decoder)throw Error('XUASTC captures need the img-3d/xuastc runtime');
+    const decoded=await integration.decoder.decode(image.bytes,{width:page.size*(page.emission?2:1),height:page.size,astc:!!g.getExtension('WEBGL_compressed_texture_astc'),bptc:!!g.getExtension('EXT_texture_compression_bptc')});
+    signal.throwIfAborted();if(generation!==epoch||g.isContextLost())throw new DOMException('Context changed','AbortError');
+    textureFormat=decoded.format;transcodeMilliseconds+=decoded.milliseconds;
+    const t=g.createTexture();textures.push(t);g.bindTexture(g.TEXTURE_2D,t);
+    if(decoded.format==='rgba')g.texImage2D(g.TEXTURE_2D,0,g.SRGB8_ALPHA8,decoded.width,decoded.height,0,g.RGBA,g.UNSIGNED_BYTE,decoded.data);
+    else g.compressedTexImage2D(g.TEXTURE_2D,0,decoded.internalFormat,decoded.width,decoded.height,0,decoded.data);
+    if(g.getError())throw Error('XUASTC texture upload failed');storage+=decoded.data.length;
+    for(const p of [g.TEXTURE_MIN_FILTER,g.TEXTURE_MAG_FILTER])g.texParameteri(g.TEXTURE_2D,p,g.LINEAR);
+    for(const p of [g.TEXTURE_WRAP_S,g.TEXTURE_WRAP_T])g.texParameteri(g.TEXTURE_2D,p,g.CLAMP_TO_EDGE);
+    continue;
+   }
+   const bitmap=await createImageBitmap(new Blob([image.bytes],{type:image.mime}),{premultiplyAlpha:'none',colorSpaceConversion:'none'});
+   try{
+    signal.throwIfAborted();if(generation!==epoch||g.isContextLost())throw new DOMException('Context changed','AbortError');
+    const page=data.pages.find(p=>p.images.includes(index)),role=page.images.indexOf(index);
+    if(bitmap.width!==page.size*(role===0?(page.emission?2:1):role===1?2:3)||bitmap.height!==page.size*(role===2?2:1))throw Error('Invalid img-3d image dimensions');
+    const t=g.createTexture();textures.push(t);g.bindTexture(g.TEXTURE_2D,t);g.pixelStorei(g.UNPACK_ALIGNMENT,1);
+    if(role===2){
+     const canvas=new OffscreenCanvas(bitmap.width,bitmap.height),ctx=canvas.getContext('2d');ctx.drawImage(bitmap,0,0);
+     const rgba=ctx.getImageData(0,0,bitmap.width,bitmap.height).data,red=new Uint8Array(rgba.length/4);
+     for(let i=0;i<red.length;i++)red[i]=rgba[i*4];
+     g.texImage2D(g.TEXTURE_2D,0,g.R8,bitmap.width,bitmap.height,0,g.RED,g.UNSIGNED_BYTE,red);storage+=red.length;
+    }else{g.texImage2D(g.TEXTURE_2D,0,role===0?g.SRGB8_ALPHA8:g.RGBA8,g.RGBA,g.UNSIGNED_BYTE,bitmap);storage+=bitmap.width*bitmap.height*4;}
+    for(const p of [g.TEXTURE_MIN_FILTER,g.TEXTURE_MAG_FILTER])g.texParameteri(g.TEXTURE_2D,p,g.LINEAR);
+    for(const p of [g.TEXTURE_WRAP_S,g.TEXTURE_WRAP_T])g.texParameteri(g.TEXTURE_2D,p,g.CLAMP_TO_EDGE);
+   }finally{bitmap.close();}
+  }
+  const batches=data.batches.map((batch,index)=>{
+   const values=new Float32Array(batch.boxes.length*56);
+   batch.boxes.forEach((b,i)=>{const at=(slot,v)=>values.set(v,i*56+slot*4);at(0,b.c);at(1,b.h);b.a.forEach((a,k)=>at(2+k,a));b.v.forEach((v,k)=>at(5+k,v));at(11,b.d.slice(0,4));at(12,b.d.slice(4,8));at(13,b.d.slice(8,12));});
+   const texture=g.createTexture();textures.push(texture);g.bindTexture(g.TEXTURE_2D,texture);
+   g.texImage2D(g.TEXTURE_2D,0,g.RGBA32F,14,batch.boxes.length,0,g.RGBA,g.FLOAT,values);storage+=values.byteLength;
+   for(const p of [g.TEXTURE_MIN_FILTER,g.TEXTURE_MAG_FILTER])g.texParameteri(g.TEXTURE_2D,p,g.NEAREST);
+   return {...batch,index,texture};
+  });
+  const result={data,batches,textures,bytes:storage,textureFormat,transcodeMilliseconds};gpu.set(url,result);trim(gpu,limits.gpuBytes);decodes++;return result;
+ }catch(error){dispose({textures});throw error;}
+}
+function program(key){if(programs.has(key))return programs.get(key);
+ const p=gl.createProgram();
+ for(const [kind,source]of [[gl.VERTEX_SHADER,vertex],[gl.FRAGMENT_SHADER,key==='pbr'?fragment:fragment.replace('precision highp float;',`#define ${key.toUpperCase()}\nprecision highp float;`)]]){
+  const shader=gl.createShader(kind);gl.shaderSource(shader,source);gl.compileShader(shader);
+  if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)){const message=gl.getShaderInfoLog(shader);gl.deleteShader(shader);gl.deleteProgram(p);throw Error(message);}
+  gl.attachShader(p,shader);gl.deleteShader(shader);
+ }
+ gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS)){const message=gl.getProgramInfoLog(p);gl.deleteProgram(p);throw Error(message);}
+ const locations={};for(const name of ['eye','right','up','forward','aspect','focal','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin'])locations[name]=gl.getUniformLocation(p,name);
+ const result={program:p,locations};programs.set(key,result);return result;
+}
+function dropSurface(el){
+ api?.forget(el);
+ const cache=el.surfaceCache;el.surfacePose=null;if(!cache)return;
+ gl?.deleteFramebuffer(cache.framebuffer);for(const texture of cache.textures)gl?.deleteTexture(texture);el.surfaceCache=null;
+}
+function surfaceCache(el,asset,w,h,opaque){
+ if(!canCache||asset.data.appearance==='baked'||!opaque.length)return null;
+ const key=[epoch,el.yaw,el.pitch,el.distance,w,h].join(',');
+ let cache=el.surfaceCache;
+ if(cache&&(cache.asset!==asset||cache.w!==w||cache.h!==h)){dropSurface(el);cache=null;}
+ const stable=el.surfacePose===key;el.surfacePose=key;
+ if(cache?.key===key){surfaceReuses++;return cache;}
+ // Orbit frames stay on the forward path; only stable views build a cache.
+ if(!stable)return null;
+ if(!cache){
+  const framebuffer=gl.createFramebuffer(),textures=[];gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);
+  const depth=depthBits===32?[gl.DEPTH_COMPONENT32F,gl.FLOAT]:[gl.DEPTH_COMPONENT24,gl.UNSIGNED_INT];
+  for(const [internal,format,type,attachment]of [[gl.RGBA32F,gl.RGBA,gl.FLOAT,gl.COLOR_ATTACHMENT0],[depth[0],gl.DEPTH_COMPONENT,depth[1],gl.DEPTH_ATTACHMENT]]){
+   const texture=gl.createTexture();textures.push(texture);gl.bindTexture(gl.TEXTURE_2D,texture);gl.texImage2D(gl.TEXTURE_2D,0,internal,w,h,0,format,type,null);
+   for(const p of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,p,gl.NEAREST);
+   for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);
+   gl.framebufferTexture2D(gl.FRAMEBUFFER,attachment,gl.TEXTURE_2D,texture,0);
+  }
+  cache={framebuffer,textures,asset,w,h,bytes:w*h*20};el.surfaceCache=cache;
+  if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){dropSurface(el);canCache=false;gl.bindFramebuffer(gl.FRAMEBUFFER,null);return null;}
+ }
+ gl.bindFramebuffer(gl.FRAMEBUFFER,cache.framebuffer);cache.key=key;
+ clear(w,h);draw(el,asset,opaque,w,h,'cache');surfaceBuilds++;return cache;
+}
+function clear(w,h,x=0,y=0){gl.viewport(x,y,w,h);gl.enable(gl.SCISSOR_TEST);gl.scissor(x,y,w,h);gl.clearColor(0,0,0,0);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);}
+function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
+ // Compile cache writes separately so forward PBR does not carry their branch.
+ const {program:p,locations:u}=program(['baked','cache','reuse'].includes(mode)?mode:'pbr');
+ const eye=[Math.sin(el.yaw)*Math.cos(el.pitch)*el.distance,Math.sin(el.pitch)*el.distance,Math.cos(el.yaw)*Math.cos(el.pitch)*el.distance];
+ const forward=unit(eye.map(x=>-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward);
+ gl.useProgram(p);for(const [name,v]of Object.entries({eye,right,up,forward}))gl.uniform3fv(u[name],v);
+ if(mode!=='baked'){
+  const light=el.lighting;gl.uniform3fv(u.lightDirection,light.direction);gl.uniform1f(u.lightIntensity,light.intensity);gl.uniform1f(u.ambientIntensity,light.ambient);
+ }
+ gl.uniform1i(u.cacheInput,mode==='reuse');gl.uniform1i(u.cacheOutput,mode==='cache');gl.uniform2i(u.origin,x,y);
+ gl.uniform1f(u.aspect,w/h);gl.uniform1f(u.focal,2.41421356);
+ const bind=(texture,slot,name)=>{gl.activeTexture(gl.TEXTURE0+slot);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(u[name],slot);};
+ bind(cache?.textures[0]??asset.textures[0],4,'hitMap');bind(cache?.textures[1]??asset.textures[0],5,'hitDepth');
+ gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.depthFunc(gl.LEQUAL);
+ for(const [batch,offset,count]of batches){
+  const page=asset.data.pages[batch.page],axes=batch.boxes[offset].a;
+  gl.frontFace(cross(axes[0],axes[1]).reduce((s,x,k)=>s+x*axes[2][k],0)<0?gl.CW:gl.CCW);
+  bind(batch.texture,0,'boxes');page.images.forEach((index,i)=>bind(asset.textures[index],i+1,['colorMap','geometryMap','shadingMap'][i]));
+  gl.uniform1i(u.offset,offset);gl.uniform1i(u.batchId,batch.index);gl.uniform1f(u.size,page.size);gl.uniform1f(u.cutoff,batch.blend?1/255:batch.cutoff);gl.uniform1i(u.emission,page.emission);gl.uniform1i(u.blended,batch.blend);
+  if(batch.blend){gl.enable(gl.BLEND);gl.blendFuncSeparate(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA,gl.ONE,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);}else{gl.disable(gl.BLEND);gl.depthMask(true);}
+  gl.drawArraysInstanced(gl.TRIANGLES,0,36,count);
+ }
+ gl.depthMask(true);
+}
+function present(el,asset,{x,y,w,h}){
+ viewRenders++;
+ const eye=[Math.sin(el.yaw)*Math.cos(el.pitch)*el.distance,Math.sin(el.pitch)*el.distance,Math.cos(el.yaw)*Math.cos(el.pitch)*el.distance],opaque=[],transparent=[];
+ for(const batch of asset.batches){if(!batch.blend)opaque.push([batch,0,batch.boxes.length]);else batch.boxes.forEach((box,i)=>transparent.push([batch,i,1,box.c.reduce((s,x,k)=>s+(x-eye[k])**2,0)]));}
+ transparent.sort((a,b)=>b[3]-a[3]);
+ const cache=surfaceCache(el,asset,w,h,opaque);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+ clear(w,h,x,y);draw(el,asset,opaque,w,h,asset.data.appearance==='baked'?'baked':cache?'reuse':'pbr',cache,x,y);
+ if(transparent.length)draw(el,asset,transparent,w,h,asset.data.appearance==='baked'?'baked':'pbr',null,x,y);
+}
+function copy(el,{x,y,w,h}){
+ if(el.canvas.width!==w||el.canvas.height!==h){el.canvas.width=w;el.canvas.height=h;}
+ if(el.gpuContext)el.replaceCanvas();
+ const ctx=el.canvasContext??=el.canvas.getContext('2d');ctx.clearRect(0,0,w,h);ctx.drawImage(surface,x,surface.height-y-h,w,h,0,0,w,h);renders++;
+}
+// Automatic updates compare rendered inputs, independent of what caused them.
+// Explicit draw() still refreshes the canvas for immediate pixel readback.
+function viewState(el,asset,w,h){
+ const light=el.lighting;
+ return[asset,el.generation,api??gl,epoch,el.canvas,w,h,el.yaw,el.pitch,el.distance,...(asset.data.appearance==='baked'?[]:[...light.direction,light.intensity,light.ambient])];
+}
+function sameView(el,state){const old=lastRendered.get(el);return old?.length===state.length&&state.every((value,i)=>Object.is(value,old[i]));}
+function dimensions(el){const ratio=Math.min(devicePixelRatio||1,2);return[Math.max(1,Math.round(el.clientWidth*ratio)),Math.max(1,Math.round(el.clientHeight*ratio))];}
+function enqueue(el,force=false){
+ if(!el.isConnected||!el.visible||!el.src)return Promise.resolve(false);
+ const generation=el.generation;
+ let job=pending.get(el);
+ if(job?.generation===generation){job.force||=force;return job.promise;}
+ const asset=gpu.get(el.url);
+ if(!force&&asset&&!asset.disposed&&sameView(el,viewState(el,asset,...dimensions(el))))return Promise.resolve(false);
+ if(!job||job.generation!==generation){
+  job={generation,force};job.promise=new Promise(resolve=>job.resolve=resolve);pending.set(el,job);
+  resource(el.url,el.abort.signal).then(asset=>{job.asset=asset;job.ready=true;if(pending.get(el)===job)pump();},error=>{job.error=error;job.ready=true;if(pending.get(el)===job)pump();});
+ }
+ pump();return job.promise;
+}
+function cancel(el){const job=pending.get(el);pending.delete(el);job?.resolve(false);}
+function layout(){
+ const ratio=Math.min(devicePixelRatio||1,2),limit=Math.min(gl?.getParameter(gl.MAX_RENDERBUFFER_SIZE)??4096,4096),views=[],regions=new Map();
+ let x=0,y=0,row=0,width=0;
+ for(const [el,job]of pending){
+  if(!job.ready)continue;
+  const w=Math.max(1,Math.round(el.clientWidth*ratio)),h=Math.max(1,Math.round(el.clientHeight*ratio));
+  if(!job.force&&job.asset&&!job.error&&sameView(el,viewState(el,job.asset,w,h))){pending.delete(el);job.resolve(false);continue;}
+  const key=JSON.stringify([el.url,el.yaw,el.pitch,el.distance,w,h,job.asset?.data.appearance==='baked'?null:el.lighting]),region=regions.get(key);
+  if(region){views.push({el,job,key,...region});continue;}
+  if(x&&x+w>Math.max(limit,w)){x=0;y+=row;row=0;}
+  if(views.length&&y+h>limit)break;
+  regions.set(key,{x,y,w,h});views.push({el,job,key,x,y,w,h});x+=w;row=Math.max(row,h);width=Math.max(width,x);
+ }
+ return{views,width,height:y+row};
+}
+// Every ready element renders into its own canvas; one submit per frame.
+async function pumpGpu(){
+ while(!document.hidden&&api){
+  await new Promise(requestAnimationFrame);
+  const chosen=api;if(!chosen||!pending.size)break;
+  let frame;const finished=[],start=performance.now();
+  for(const [el,job]of [...pending]){
+   if(!job.ready)continue;pending.delete(el);
+   try{
+    if(el.isConnected&&el.visible&&job.generation===el.generation&&!document.hidden){
+     if(job.error)throw job.error;if(job.asset.disposed)throw new DOMException('Released','AbortError');
+     const [w,h]=dimensions(el),state=viewState(el,job.asset,w,h);
+     if(!job.force&&sameView(el,state)){job.resolve(false);continue;}
+     frame??=chosen.frame();
+     if(!chosen.present(frame,el,job.asset,w,h)){pending.set(el,job);break;}
+     viewRenders++;finished.push([el,job,state]);
+    }else{if(document.hidden)enqueue(el);job.resolve(false);}
+   }catch(error){
+    if(job.generation===el.generation&&el.isConnected&&!el.abort.signal.aborted&&error?.name!=='AbortError')el.fail(error);
+    else if(error?.name==='AbortError'&&el.isConnected&&el.visible)queueMicrotask(()=>enqueue(el));
+    job.resolve(false);
+   }
+   if(performance.now()-start>=12)break;
+  }
+  if(frame)chosen.submit(frame);
+  if(!finished.length&&![...pending.values()].some(job=>job.ready))break;
+  for(const [el,job,state]of finished){
+   lastRendered.set(el,state);
+   el.data=job.asset.data;el.status.textContent='';renders++;
+   if(el.loadedGeneration!==el.generation){el.loadedGeneration=el.generation;el.dispatchEvent(new Event('load'));}
+   job.resolve(true);
+  }
+ }
+}
+async function pump(){
+ if(running||document.hidden||![...pending.values()].some(job=>job.ready))return;running=true;
+ if(api){try{await pumpGpu();}finally{running=false;if(pending.size&&!document.hidden)pump();}return;}
+ try{while(!document.hidden){
+  await new Promise(requestAnimationFrame);
+  if(!pending.size)break;
+  const batch=layout(),finished=[],rendered=new Set(),start=performance.now();if(!batch.views.length)break;
+  for(const view of batch.views){
+   const {el,job}=view;if(pending.get(el)!==job)continue;pending.delete(el);
+   try{
+    if(el.isConnected&&el.visible&&job.generation===el.generation){
+     if(job.error)throw job.error;const asset=job.asset;
+     if(el.isConnected&&el.visible&&job.generation===el.generation&&!document.hidden&&!gl.isContextLost()){
+      if(surface.width!==batch.width||surface.height!==batch.height){surface.width=batch.width;surface.height=batch.height;}
+      if(!rendered.has(view.key)){present(el,asset,view);rendered.add(view.key);}finished.push({view,asset,epoch});
+     }else{if(document.hidden)enqueue(el);job.resolve(false);}
+    }else job.resolve(false);
+   }catch(error){
+    if(job.generation===el.generation&&el.isConnected&&!el.abort.signal.aborted&&error?.name!=='AbortError')el.fail(error);
+    job.resolve(false);
+   }
+   if(performance.now()-start>=12)break;
+  }
+  // Submit every view before copying: one shared GPU image, not a flush per card.
+  for(const {view,asset,epoch:renderEpoch}of finished){
+   const {el,job}=view;let success=false;
+   try{
+   if(el.isConnected&&el.visible&&job.generation===el.generation&&!document.hidden&&renderEpoch===epoch&&!gl.isContextLost()){
+    copy(el,view);lastRendered.set(el,viewState(el,asset,view.w,view.h));el.data=asset.data;el.status.textContent='';success=true;
+    if(el.loadedGeneration!==el.generation){el.loadedGeneration=el.generation;el.dispatchEvent(new Event('load'));}
+   }else if(document.hidden||renderEpoch!==epoch)enqueue(el);
+   }catch(error){if(job.generation===el.generation&&!el.abort.signal.aborted)el.fail(error);}
+   job.resolve(success);
+  }
+ }}finally{running=false;if(pending.size&&!document.hidden)pump();}
+}
+const intersection=new IntersectionObserver(entries=>{for(const {target:el,isIntersecting}of entries){el.visible=isIntersecting;if(isIntersecting)el.load();else{el.abort?.abort();cancel(el);dropSurface(el);}}trimCaches();},{rootMargin:'128px'});
+const resize=new ResizeObserver(entries=>{for(const {target}of entries)enqueue(target);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){for(const el of elements)enqueue(el);pump();}});
+addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
+
+/** A static box capture. Many elements share one context and bounded caches. */
+export class Img3d extends HTMLElement {
+ static observedAttributes=['src'];
+ static get statistics(){
+  const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
+  return {backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length,attachmentBytes:api?.attachmentBytes??0,validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
+ }
+ get textureBytes(){return gpu.get(this.url)?.bytes??0;}
+ get textureFormat(){return gpu.get(this.url)?.textureFormat??null;}
+ get transcodeMilliseconds(){return gpu.get(this.url)?.transcodeMilliseconds??0;}
+ get lighting(){return this.light??{direction:[-.6,1,1],intensity:2.5,ambient:1};}
+ set lighting(value){
+  const direction=value?.direction,scalar=(v,f,max)=>Number.isFinite(v)?Math.max(0,Math.min(max,v)):f;
+  this.light={direction:numbers(direction,3)&&Math.hypot(...direction)>1e-8?[...direction]:[-.6,1,1],intensity:scalar(value?.intensity,2.5,20),ambient:scalar(value?.ambient,1,4)};
+  enqueue(this);
+ }
+ get src(){return this.getAttribute('src')??'';}
+ set src(value){this.setAttribute('src',value);}
+ constructor(){
+  super();this.generation=0;this.visible=false;
+  this.attachShadow({mode:'open'}).innerHTML='<style>:host{display:inline-block;position:relative;width:300px;height:300px}canvas{width:100%;height:100%;display:block;touch-action:pan-y pinch-zoom}span{position:absolute;padding:1em;pointer-events:none}</style><span role="status"></span><canvas tabindex="0" aria-label="3D model. Drag or arrow keys rotate; plus and minus zoom; Home resets."></canvas>';
+  this.canvas=this.shadowRoot.querySelector('canvas');this.status=this.shadowRoot.querySelector('span');this.reset();
+  this.canvas.onpointerdown=e=>{if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
+  this.canvas.onpointermove=e=>{if(!this.pointer)return;if(this.pointer[2]==='touch'&&Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;this.yaw-=(e.clientX-this.pointer[0])*.01;this.pitch=Math.max(-1.5,Math.min(1.5,this.pitch+(e.clientY-this.pointer[1])*.01));this.pointer=[e.clientX,e.clientY,e.pointerType];enqueue(this);};
+  this.canvas.onpointerup=this.canvas.onpointercancel=()=>{this.pointer=null;};
+  this.canvas.onwheel=e=>{if(!e.altKey)return;e.preventDefault();this.distance=Math.max(1.8,Math.min(15,this.distance*Math.exp(e.deltaY*.001)));enqueue(this);};
+  this.canvas.ondblclick=()=>this.reset();
+  this.canvas.onkeydown=e=>{
+   if(e.key==='Home')this.reset();else if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;
+   else if(e.key==='ArrowUp')this.pitch=Math.min(1.5,this.pitch+.1);else if(e.key==='ArrowDown')this.pitch=Math.max(-1.5,this.pitch-.1);
+   else if(e.key==='+'||e.key==='=')this.distance=Math.max(1.8,this.distance*.9);else if(e.key==='-')this.distance=Math.min(15,this.distance/.9);else return;
+   e.preventDefault();enqueue(this);
+  };
+ }
+ reset(){this.yaw=.55;this.pitch=.2;this.distance=4;enqueue(this);}
+ // A canvas bound to a lost WebGPU device cannot take a 2D context; a fresh one
+ // with the same handlers serves the WebGL fallback.
+ replaceCanvas(){
+  const old=this.canvas,next=old.cloneNode(false);
+  for(const name of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onwheel','ondblclick','onkeydown'])next[name]=old[name];
+  old.replaceWith(next);this.canvas=next;this.gpuContext=this.gpuDevice=null;
+ }
+ connectedCallback(){elements.add(this);resize.observe(this);intersection.observe(this);this.load();}
+ disconnectedCallback(){elements.delete(this);resize.unobserve(this);intersection.unobserve(this);this.visible=false;this.release();if(!elements.size)clearCaches();}
+ attributeChangedCallback(){this.release();if(this.isConnected)this.load();}
+ release(){this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
+ async load(){
+  if(!this.isConnected||!this.visible)return;
+  const url=this.src?new URL(this.src,this.baseURI).href:null;
+  if(!url){this.release();this.url=null;this.status.textContent='';return;}
+  if(this.url!==url){this.release();this.url=url;}
+  if(!this.abort||this.abort.signal.aborted)this.abort=new AbortController();
+  const generation=this.generation;this.status.textContent=this.data?'':'Loading…';
+  try{await resource(url,this.abort.signal);if(generation===this.generation)await enqueue(this);}
+  catch(error){if(generation===this.generation&&!this.abort.signal.aborted&&error?.name!=='AbortError')this.fail(error);}
+ }
+ fail(error){this.data=null;blank(this);this.status.textContent=error.message;this.dispatchEvent(new CustomEvent('error',{detail:error}));}
+ draw(){return enqueue(this,true);}
+}
+if(customElements.get('img-3d'))Img3d=customElements.get('img-3d');else customElements.define('img-3d',Img3d);

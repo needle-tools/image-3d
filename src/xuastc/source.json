@@ -1,0 +1,33 @@
+{
+  "source": "https://github.com/BinomialLLC/basis_universal/tree/d8f36fcbb09e79614e96baaed5b1e1cd5d2f5e73",
+  "revision": "d8f36fcbb09e79614e96baaed5b1e1cd5d2f5e73",
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 4.0.24-git",
+  "flags": [
+    "-Oz",
+    "-flto",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-DNDEBUG",
+    "-DBASISU_SUPPORT_ENCODING=0",
+    "-DBASISD_SUPPORT_ATC=0",
+    "-DBASISD_SUPPORT_PVRTC1=0",
+    "-DBASISD_SUPPORT_PVRTC2=0",
+    "-DBASISD_SUPPORT_FXT1=0",
+    "-DBASISD_SUPPORT_ETC2_EAC_RG11=0"
+  ],
+  "options": [
+    "--no-entry",
+    "-s",
+    "STANDALONE_WASM=1",
+    "-s",
+    "ALLOW_MEMORY_GROWTH=1",
+    "-s",
+    "FILESYSTEM=0",
+    "-s",
+    "MALLOC=emmalloc",
+    "-s",
+    "EXPORTED_FUNCTIONS=[\"_malloc\",\"_free\",\"_i3d_init\",\"_i3d_open\",\"_i3d_info\",\"_i3d_size\",\"_i3d_decode\",\"_i3d_close\"]"
+  ],
+  "wasmSha256": "e7559e703b15e3763cee6cf61fbedb433dddde2747c9b67cb6bad71f0ace35b9",
+  "bridgeSha256": "ecd3d90869be414f73a290572f668e13aeddf1f656f5ccacb199e1a0405798c4"
+}

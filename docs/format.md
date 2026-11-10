@@ -1,0 +1,259 @@
+# Image 3D format and runtime
+
+A browser-only custom element: one JavaScript file and one `.i3d` capture. It
+renders with WebGPU when the browser provides it and with WebGL 2 otherwise. The
+core uses native image decoding and renders only when a view changes.
+
+```html
+<script type="module" src="img-3d.js"></script>
+<img-3d src="model.i3d" style="width:400px;height:400px"></img-3d>
+```
+
+Or import `@needle-tools/image-3d`. The entry
+registers itself. Drag or arrow keys orbit;
+Alt+wheel or +/- zoom; double-click or Home resets. `src` replaces the capture;
+`load` and `error` events report the outcome. Removing the element cancels its
+loading. The final disconnect releases caches and the optional decoder worker.
+
+`npm run build` builds both standalone entries. The ordinary package build
+and prepare path include them. HTTPS or localhost is required for native
+DecompressionStream; generated self-contained HTML also works from disk in the
+tested Chrome. The [project README](../README.md) documents conversion, qualification and the comparison page.
+
+## Runtime boundary
+
+The generated viewer has no runtime dependency on Three.js or the Mesh Effects
+package. Its source lives here; the build bundles local helpers into one file.
+
+The runtime consumes versioned captures. It owns its shader and interval
+refinement implementation; producers share the file contract rather than a
+runtime dependency. The standalone shader writer emits GLSL and WGSL at build
+time and is not shipped. Both backends draw compact twelve-triangle boxes and
+reconstruct depth in shaders, without surface meshes or geometry LODs.
+
+## Appearance and optional GPU compression
+
+The format displays static box captures with inherited affine transforms and
+separate transparent batches. Freeze animation before conversion. It always
+traces captured depth and selects the nearest supported surface, independently
+of the original projection/interpolation settings. Dithered opacity uses alpha
+blending. There are two appearance modes:
+
+- PBR attributes: a small GGX key light and hemisphere approximation, without
+  environment maps, shadows, transmission or Three.js's full PBR pipeline.
+  Set `element.lighting = { direction: [1, 1, 0], intensity: 4, ambient: 0.3 }`
+  to relight and redraw that element. Set it to `null` to restore the default
+  key `[-0.6, 1, 1]`, intensity `2.5` and hemisphere strength `1`.
+- Baked studio radiance: outgoing color from the workbench's studio PMREM with
+  fixed ACES tone mapping, captured in six orthographic directions per box.
+  Supported nearby surfaces blend with directional weights. Normals, material
+  maps and lighting calculations are absent from this compiled shader. Lighting
+  cannot change at runtime; six directions approximate glossy reflections.
+
+The smaller shader's rendering approximation is measured separately from codec
+error. It is not a replacement for full glTF PBR rendering.
+
+For XUASTC captures, use **one** complete optional entry instead of the core:
+
+```html
+<script type="module" src="img-3d-xuastc.js"></script>
+<img-3d src="gpu-compressed.i3d"></img-3d>
+```
+
+Its npm entry is `@needle-tools/image-3d/xuastc`.
+It includes the core and embedded Basis Universal WASM, with no external decoder
+request. A shared worker transcodes color to sRGB ASTC when supported, otherwise
+BC7, otherwise RGBA. Native numeric geometry stays lossless. If policy blocks
+Blob workers, trusted WASM decoding falls back to the main thread. If WASM is
+also forbidden, the element reports an error and other native captures continue.
+CSP must permit WebAssembly compilation for either path. No neural codec is used.
+
+Loading the optional entry after the core is supported: it registers its decoder
+with the existing owner, preserving one renderer and the same exported class.
+This lazy-loading strategy downloads the core portion twice; a deployment using
+only the optional entry avoids that overhead. Decoder lifetime and textures are
+shared across every element, not allocated per element.
+
+The embedded WASM is gzip packed and expanded once with the same native
+`DecompressionStream` required by the capture container. Separate cold worker
+startup from warm transcoding when measuring it: compilation, instantiation and
+lookup-table initialization happen before the first image can be decoded.
+
+The decoder binary is pinned by `xuastc/source.json` (source commit, compiler,
+flags and artifact hashes). To reproduce it with Emscripten installed:
+`node scripts/build-img-3d-xuastc.mjs /path/to/basis_universal`. Normal consumers
+need no compiler. Basis Universal's license and notice and Zstandard's BSD license ship in
+`xuastc/` and are embedded in the standalone JavaScript file.
+
+## Many elements
+
+Every element in a document shares **one WebGPU device**, or **one WebGL2
+context** in the WebGL renderer. Each element owns an ordinary canvas, so CSS
+clipping, transforms, stacking and nested or page scrolling use native browser
+compositing.
+
+| Renderer | Per frame |
+|---|---|
+| WebGPU | All changed views render together into a shared atlas; a GPU texture copy moves each view into its element's WebGPU canvas. |
+| WebGL 2 | All changed views render into a shared frame; each element's 2D canvas copies its region. |
+
+Intersection observation delays offscreen loading/rendering. URL requests are
+deduplicated with three concurrent fetches, and GPU uploads are shared. A loading
+source does not block ready views. Draws coalesce per element within a 12 ms CPU
+submission budget. In the WebGL renderer, identical source, camera, size and
+light settings reuse one render within a frame. GPU cost still depends on the number and size of
+distinct views. Rendering pauses while the document
+is hidden. Normal wheel and
+vertical touch gestures scroll the page. Only Alt+wheel zooms a view.
+
+Visible models, including the 128-pixel preload margin, retain their shared GPU
+textures and encoded data automatically. Multiple elements showing one URL
+share that residency; the last visible owner releases it to the inactive cache.
+Inactive GPU textures use an eight-asset / 64 MiB LRU cache; inactive encoded
+images use an eight-asset / 32 MiB cache. Scrolling, replacing a source and
+disconnecting trim that cache. The visible working set is additional to those
+limits; it is reported separately by `Img3d.statistics`. Returning to an evicted
+model recreates textures. Raster canvases still use
+memory proportional to element size and pixel density, like decoded images.
+`Img3d.statistics` reports shared counts and payload bytes. Instance getters
+`textureBytes`, `textureFormat` and `transcodeMilliseconds` describe the current
+resident capture; payload bytes exclude driver and raster-canvas overhead.
+
+Automatic updates compare the source, camera pose, physical canvas size,
+renderer generation and lighting values with the last rendered state. Equivalent
+settings do not redraw, and changes reverted before the next frame are discarded.
+Baked appearances ignore lighting changes. Explicit `draw()` still forces a
+refresh for immediate pixel readback.
+
+WebGPU rasterizes twelve triangles per box and reconstructs captured depth in
+the fragment shader. The nearest supported hit determines visibility; shading
+then runs once per visible pixel. A compact min/max depth pyramid skips empty
+intervals without adding vertices. Large elements use the same geometry as small
+ones. Light-only changes reuse opaque and translucent visibility; camera, source
+or size changes retrace it. Offscreen elements release their visibility caches.
+A view larger than the shared atlas renders in a frame of its own, up to the
+device texture limit; larger views report an error. Read a WebGPU canvas with
+`drawImage` or `toDataURL` when `draw()` resolves, before presentation.
+
+In the WebGL renderer, forward tracing batches 16 independent depth samples and visits crossing
+intervals through a bit mask. It retains the texel-scaled sample grid, five
+refinement iterations and all hit validation; it does not impose a quality cap.
+PBR visits camera-facing fields first, retaining all six fields and nearest-hit
+ties. Baked accumulation retains its capture order. Forward PBR, cache writes,
+cache reuse and baked rendering use separately compiled programs.
+
+WebGL light-only updates reuse opaque surface intersections after a camera has stayed
+unchanged for two draws. Changing the camera renders directly until it settles;
+baked captures and transparent batches retain their forward rendering paths.
+Carrier triangle edges also trace directly to preserve antialiasing. When an
+opaque cached owner covers the whole pixel, its depth conservatively bounds
+those edge searches while retaining depth ties. This cache requires renderable
+float textures and a 24- or 32-bit destination depth buffer; other devices use
+the forward path. Cache depth attachments match the destination precision.
+Each cached view uses 20 bytes per physical pixel in addition to source textures
+and raster canvases. `surfaceBytes` and `surfaceCaches` report this separate
+working set; `surfaceBuilds`, `surfaceReuses` and `viewRenders` count cache builds,
+reuse and actual rendered views. Offscreen views, source replacement, disconnect
+and context loss release these caches. A distinct camera for every card still
+requires a distinct rendered view, even when only the light moves.
+
+WebGL context loss retains raster images; restoration rebuilds visible views.
+After WebGPU device loss, a new device redraws visible views; when none is
+available, elements continue with the WebGL renderer. The last disconnect clears
+caches.
+
+`Img3d.statistics` reports the active `backend` and WebGPU `adapter`, `devices`,
+`canvasContexts`, transient `attachmentBytes` and `validationErrors`; `contexts`
+counts WebGL contexts.
+
+## I3D1 file
+
+Four magic bytes `I3D1`, then gzip: little-endian uint32 JSON length, UTF-8 JSON,
+and consecutive image bytes. The envelope remains I3D1; metadata versions are
+explicit: **1** for PBR attributes, **2** with `appearance:"baked"` for baked
+radiance. Older readers reject metadata version 2 clearly.
+
+Pages explicitly name image indices, MIME types, byte lengths and oriented-box
+batches. Centers and affine bases normalize to a two-unit scene. Half sizes,
+six pixel rectangles excluding gutters and twelve uint16 depth bounds rebuild
+the volume. Nothing is inferred from fallback material slots or sidecar names.
+
+PBR pages contain three opaque RGB images:
+
+1. sRGB color, optionally with an adjacent emissive pane.
+2. Lossless geometry: depth high/low bytes and coverage at left, opacity at right.
+3. Grayscale shading planes in a 3×2 grid: octahedral normal X/Y, roughness,
+   occlusion and metalness. They upload as R8.
+
+Baked pages contain only radiance and the identical lossless geometry image.
+Color is native PNG/JPEG/WebP/AVIF, or XUASTC KTX2 through the optional entry.
+Native color uploads to RGBA; GPU compression reduces color texture storage.
+Numeric depth, coverage and opacity are never sent through a lossy color codec.
+All image bytes are embedded in the single capture; assets supply no executable
+code or decoder URLs.
+
+### Metadata fields
+
+The JSON object has `version`, `pages`, `batches` and `images`. Version 2 also
+requires `appearance: "baked"`; version 1 omits `appearance`.
+
+- `images`: ordered `{bytes, mime}` records. `bytes` is the exact encoded payload
+  length. Payloads follow the JSON in this same order, without separators.
+  MIME types are `image/png`, `image/jpeg`, `image/webp`, `image/avif` or
+  `image/ktx2`. KTX2 color requires the optional decoder entry.
+- `pages`: `{size, emission, images}`. `size` is the square capture-atlas side
+  `N`. `images` contains three indices for PBR, or two for baked radiance, in the
+  role order above. Indices partition the image list; pages do not share image
+  indices. `emission` is a boolean and is false for baked pages.
+- `batches`: `{page, blend, cutoff, boxes}`. `page` selects a capture page;
+  `blend` selects alpha blending rather than cutout rendering; `cutoff` is
+  strictly between zero and one. Each batch contains at least one box.
+- Each box is `{c, a, h, v, d}`. `c` is its three-component center. `a` is three
+  affine axis vectors, and `h` is three positive half sizes. A point `q` inside
+  the unit box maps to `c + Σ a[k] * h[k] * q[k]`. The basis must be invertible;
+  inherited nonuniform scale and mirroring are supported. `v` contains six
+  `[x, y, width, height]` atlas rectangles in pixels, with gutters excluded.
+  `d` contains six `[near, far]` pairs, flattened to twelve uint16 values. A pair
+  with `near > far` declares an empty capture. Full bounds are `[0, 65535]`.
+
+Centers and axes share one scene coordinate system. The converter centers the
+whole object at zero and scales its largest extent to two units. The default
+camera looks at the origin from distance four with a 45° vertical field of view.
+
+### Face and depth conventions
+
+The six rectangles and depth-bound pairs use this order, in box-local coordinates:
+
+| Index | Normal | Image right | Image up |
+| --- | --- | --- | --- |
+| 0 | +X | −Z | +Y |
+| 1 | −X | +Z | +Y |
+| 2 | +Y | +X | −Z |
+| 3 | −Y | +X | +Z |
+| 4 | +Z | +X | +Y |
+| 5 | −Z | −X | +Y |
+
+For a local point `q`, image coordinates are
+`(dot(q, right) * .5 + .5, dot(q, up) * .5 + .5)` within the face rectangle.
+Depth is `(1 - dot(q, normal)) * .5`: zero at the front plane and one at the
+opposite plane. Its uint16 value is stored as high byte R and low byte G.
+Atlas rows and rectangles use the image's top-to-bottom byte order; do not add
+an implicit texture flip when writing a capture.
+
+For PBR, color is `N×N`, or `2N×N` when `emission` is true (base color at left,
+emission at right). Geometry is always `2N×N`: the left half holds depth R/G and
+coverage B, and the right half holds opacity R with unused G/B set to zero.
+Shading is `3N×2N`. Its six scalar tiles are octahedral normal X, normal Y,
+roughness, occlusion, metalness and an unused zero tile, in row-major order.
+Each scalar is repeated in R/G/B so luminance codecs preserve it. Baked color
+is `N×N` radiance and has no shading image or separate emission pane.
+
+Material attributes are coverage-premultiplied. Color/radiance is premultiplied
+in linear space before sRGB encoding; scalar material and encoded-normal values
+are multiplied by coverage. Depth bytes are not premultiplied. Coverage and
+opacity are unorm8; depth/support/opacity must retain their exact bytes.
+Octahedral normals use the standard L1 projection onto the octahedron, fold its
+negative-Z hemisphere, then map XY from `[-1,1]` to `[0,1]` before premultiplying.
+
+The format supplies data only. Decoders come from the application, never from
+an asset-provided script, module URL or sidecar.
