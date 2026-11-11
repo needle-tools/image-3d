@@ -59,6 +59,6 @@
     "typescript": "5.9.3",
     "draco3d": "1.5.7",
     "meshoptimizer": "1.2.0",
-    "three": "npm:@needle-tools/three@0.185.2-alpha.8"
+    "three": "npm:@needle-tools/three@0.186.2-alpha.0"
   }
 }
