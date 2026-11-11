@@ -117,6 +117,11 @@ Responsive sources use converter-measured frame widths, not atlas sides:
 ```
 
 The critical style reserves space before JavaScript runs. The component supports
+`orbit-fit="fixed"` (or `element.orbitFit = 'fixed'`) to keep a constant scale
+while rotating. The default is `auto`, which widens the frame to avoid clipping.
+Fixed framing can clip wider views unless the capture has sufficient margin.
+
+The component supports
 `object-fit` and `object-position`, preserves its current view while loading a
 responsive upgrade, and keeps camera interaction live during that download.
 Shrinking or zooming out retains a loaded higher-resolution candidate.

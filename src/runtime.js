@@ -559,7 +559,7 @@ function viewState(el,asset,w,h){
  return[asset,el.generation,api??gl,epoch,el.canvas,w,h,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
 }
 function sameView(el,state){const old=lastRendered.get(el);return old?.length===state.length&&state.every((value,i)=>Object.is(value,old[i]));}
-function dimensions(el){const camera=cameraPose(el),ratio=Math.min(devicePixelRatio||1,2),style=getComputedStyle(el),[w,h]=contentSize(el,style),key=[w,h,style.objectFit,style.objectPosition,el.frameRatio,el.naturalWidth,el.metadata,...(el.metadata?.frame??el.data?.display?.frame??[]),...(el.metadata?.support?[camera.yaw,camera.pitch]:[])];if(!el.layoutKey||key.some((v,i)=>v!==el.layoutKey[i])){el.layoutKey=key;el.layout=frameLayout(el,w,h,style);el.layoutSignature=[el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy,el.frameRatio];}return[Math.max(1,Math.round(w*ratio)),Math.max(1,Math.round(h*ratio))];}
+function dimensions(el){const camera=cameraPose(el),ratio=Math.min(devicePixelRatio||1,2),style=getComputedStyle(el),[w,h]=contentSize(el,style),key=[w,h,style.objectFit,style.objectPosition,el.orbitFit,el.frameRatio,el.naturalWidth,el.metadata,...(el.metadata?.frame??el.data?.display?.frame??[]),...(el.metadata?.support&&el.orbitFit!=='fixed'?[camera.yaw,camera.pitch]:[])];if(!el.layoutKey||key.some((v,i)=>v!==el.layoutKey[i])){el.layoutKey=key;el.layout=frameLayout(el,w,h,style);el.layoutSignature=[el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy,el.frameRatio];}return[Math.max(1,Math.round(w*ratio)),Math.max(1,Math.round(h*ratio))];}
 function enqueue(el,force=false){
  if(!el.isConnected||!el.visible||!(el.src||el.srcset))return Promise.resolve(false);
  const size=dimensions(el),selected=el.pickSource(true);if(selected===el.failedSource&&!el.url)return Promise.resolve(false);if(selected!==el.url&&selected!==el.failedSource){const loading=el.load();if(!el.data||!el.adaptiveLoad)return loading;}
@@ -668,7 +668,7 @@ addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
 
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {
- static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class'];
+ static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit'];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
   return {backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length,attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
@@ -686,6 +686,8 @@ export class Img3d extends HTMLElement {
  get srcset(){return this.getAttribute('srcset')??'';}
  set srcset(value){if(this.srcset!==value)this.setAttribute('srcset',value);}
  get currentSrc(){return this.url??'';}
+ get orbitFit(){return this.getAttribute('orbit-fit')==='fixed'?'fixed':'auto';}
+ set orbitFit(value){this.setAttribute('orbit-fit',value);}
  get naturalWidth(){return this.metadata?.width??this.data?.display?.width??(this.data?300:0);}
  get naturalHeight(){return this.metadata?.height??this.data?.display?.height??(this.data?300:0);}
  get width(){return this.clientWidth;}

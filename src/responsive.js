@@ -26,7 +26,7 @@ const position=(value,free)=>{const terms=[...value.replace(/\s/g,'').matchAll(/
 /** Keep a stable upright frame; widen it only when another orbit would clip. */
 function orbitFrame(el){
  const display=el.metadata??el.data?.display,[x,y,w,h]=display?.frame??[0,0,1,1],b=display?.support;
- if(!b)return[x,y,w,h];
+ if(!b||el.orbitFit==='fixed')return[x,y,w,h];
  const camera=cameraPose(el),yaw=camera.yaw??.55,pitch=camera.pitch??.2,s=Math.sin(yaw),c=Math.cos(yaw),p=Math.sin(pitch),q=Math.cos(pitch),center=[x+w/2,y+h/2];let scale=1;
  for(let i=0;i<b.length;i+=3){
   const a=b[i],d=b[i+1],e=b[i+2],z=4-(a*s*q+d*p+e*c*q);

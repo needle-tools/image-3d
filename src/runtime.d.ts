@@ -8,6 +8,8 @@ export declare class Img3d extends HTMLElement {
   /** Candidate widths are converter-measured usable frame pixels, not atlas sizes. */
   srcset: string;
   readonly currentSrc: string;
+  /** Keep capture framing fixed, or automatically widen it to avoid clipping during orbit. */
+  orbitFit: 'auto' | 'fixed';
   readonly naturalWidth: number;
   readonly naturalHeight: number;
   width: number;
