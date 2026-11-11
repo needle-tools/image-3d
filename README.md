@@ -24,6 +24,11 @@ the five-model demo at 512 and 1024, live/baked lighting, native/XUASTC variants
 asset download is needed to run it. Generated runtime bundles are copied into
 the demo when starting it.
 
+**Reference** compares the 3D capture with the existing **32 WebP views** at the
+selected resolution. Drag either pane horizontally, or use its arrow keys, to
+rotate both views at matching cameras and a fixed elevation. Selecting **32 WebP
+views** under Appearance shows that same turntable on its own.
+
 `demo/public/` has one folder per model, resolution and representation:
 
 ```text
@@ -32,8 +37,6 @@ owl-512-i3d/
   live-xuastc.i3d
   baked.i3d
   baked-xuastc.i3d
-  baked-lossless.i3d
-  reference/
 owl-512-32views/
   model.json
   view-0.webp
@@ -46,10 +49,16 @@ watch-512-32views/
 runtime/
 ```
 
-The same layout applies to all five models at both resolutions. The lossless
-baked capture and reference PNGs support quality comparisons. Folders ending
+The same layout applies to all five models at both resolutions. Folders ending
 in `-32views` hold source-rendered WebP turntables; `runtime/` contains generated JavaScript.
+Full-quality PNGs and lossless captures live in `tests/fixtures/quality/` for
+automated quality checks and are excluded from the deployed demo.
 Browser-test screenshots stay under `.local/test-results/demo/`.
+
+The demo uses the [Needle Brand System](https://brand.needle.tools/) dark palette
+and a local Nunito Sans Latin variable font from
+[Google Fonts](https://fonts.google.com/specimen/Nunito+Sans), licensed under
+[SIL OFL 1.1](demo/fonts/OFL.txt).
 
 ## Use the runtime
 

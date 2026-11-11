@@ -18,9 +18,19 @@ test('one comparison page switches models, resolutions, appearance, references a
   assert(!requests.some(r=>r.endsWith('/img-3d-xuastc.js')),'Decoder downloaded for native appearance');
   const transparent=async locator=>{for(const style of await locator.evaluateAll(elements=>elements.map(el=>{const s=getComputedStyle(el);return{background:s.backgroundColor,image:s.backgroundImage,outline:s.outlineStyle,shadow:s.boxShadow};}))){assert.equal(style.background,'rgba(0, 0, 0, 0)','Viewer acquired a solid panel');assert.equal(style.image,'none');assert.equal(style.outline,'none','Viewer acquired an outline');assert.equal(style.shadow,'none','Viewer acquired a shadow');}};
   await transparent(page.locator('#stage figure,#viewer'));
-  await page.getByLabel('Reference',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('#referenceImage').complete&&document.querySelector('#referenceImage').naturalWidth>0);
+  for(const name of ['Move light','Follow mouse','Item size'])assert.equal(await page.getByLabel(name,{exact:true}).isVisible(),false,name+' should be hidden for a single baked view');
+  await page.getByLabel('Reference',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('#referenceViewer').data&&document.querySelector('#referenceViewer').image.naturalWidth===512);
   await page.locator('#view').fill('9');await page.locator('#view').dispatchEvent('input');
-  await page.waitForFunction(()=>document.querySelector('#viewer').yaw===Math.PI*1.5);
+  await page.waitForFunction(()=>document.querySelector('#viewer').yaw===9*Math.PI/16);
+  const sourceImage=page.locator('#referenceViewer img'),referenceBox=await sourceImage.boundingBox(),start=[referenceBox.x+referenceBox.width/2,referenceBox.y+referenceBox.height/2];
+  await page.mouse.move(...start);await page.mouse.down();await page.mouse.move(start[0]+60,start[1]+5,{steps:4});
+  await page.waitForFunction(()=>document.querySelector('#view').value==='6');
+  assert.equal(await page.evaluate(()=>document.querySelector('#viewer').pitch),.2);
+  assert.equal(await page.evaluate(()=>document.querySelector('#viewer').yaw),3*Math.PI/8);
+  await page.mouse.move(start[0]+60,start[1]+65);assert.equal(await page.locator('#view').inputValue(),'6','Vertical reference drag changed the camera');
+  await page.mouse.up();await page.mouse.move(start[0]+120,start[1]+65);assert.equal(await page.locator('#view').inputValue(),'6','Reference kept rotating after release');
+  assert.equal(await page.getByLabel('Reference',{exact:true}).isChecked(),true,'Reference drag left the comparison');
+  await sourceImage.press('ArrowRight');await page.waitForFunction(()=>document.querySelector('#view').value==='7'&&document.querySelector('#viewer').yaw===7*Math.PI/16);
   await page.screenshot({path:resolve(screenshots,'comparison-reference.png')});
   await page.locator('#viewer canvas').dispatchEvent('wheel',{altKey:true,deltaY:100});assert.equal(await page.getByLabel('Reference',{exact:true}).isChecked(),false,'Zoom left an unmatched reference visible');
   await page.getByLabel('Reference',{exact:true}).check();
@@ -28,7 +38,7 @@ test('one comparison page switches models, resolutions, appearance, references a
   await page.getByText('Measurements',{exact:true}).click();assert.match(await page.locator('#metrics').innerText(),/ASTC/,'Measured GPU format was hidden');await page.getByText('Measurements',{exact:true}).click();
   await page.getByLabel('Appearance',{exact:true}).selectOption('pbr');await page.waitForFunction(()=>document.querySelector('#viewer')?.data&&!document.querySelector('#viewer').data.appearance);
   await page.getByLabel('Move light',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('#viewer').lighting.intensity===4);
-  assert.equal(await page.locator('#referenceFigure').isVisible(),false,'Moving light added an extra comparison pane');
+  assert.equal(await page.locator('#referenceFigure').isVisible(),false,'Moving light added an extra comparison pane');assert.equal(await page.getByLabel('Reference',{exact:true}).isVisible(),false);
   const sample=()=>page.evaluate(async()=>{const el=document.querySelector('#viewer');await el.draw();return [...(c=>{const copy=new OffscreenCanvas(c.width,c.height),x=copy.getContext('2d');x.drawImage(c,0,0);return x;})(el.canvas).getImageData(0,0,el.canvas.width,el.canvas.height).data];});
   const lit=await sample();await page.waitForTimeout(300);const moved=await sample();assert(lit.some((v,i)=>i%4!==3&&Math.abs(v-moved[i])>5),'Animated light did not visibly change the live view');
   await page.getByLabel('Move light',{exact:true}).uncheck();assert.deepEqual(await page.evaluate(()=>document.querySelector('#viewer').lighting),{direction:[-.6,1,1],intensity:2.5,ambient:1});
@@ -43,22 +53,31 @@ test('one comparison page switches models, resolutions, appearance, references a
    await page.getByLabel('Appearance',{exact:true}).selectOption(variant.id);
    await page.waitForFunction(({src,size,webp})=>{const el=document.querySelector(webp?'#turntable':'#viewer');return el.data&&el.src===src&&(webp?el.data.size===size&&Number.isInteger(el.frame)&&el.image.naturalWidth===size&&el.image.src.includes(src.replace('model.json','view-')):el.data.pages[0].size===size);},{src:variant.src,size:resolution.size,webp:variant.id==='webp'});
    if(variant.id==='webp'){
-    assert.equal(await page.getByLabel('Reference',{exact:true}).isEnabled(),false);
+    assert.equal(await page.getByLabel('Reference',{exact:true}).isVisible(),false);
     assert.equal(await page.locator('#referenceFigure').isVisible(),false,'Source turntable showed a missing reference image');
+   }
+   if(variant.id!=='webp'&&await page.getByLabel('Reference',{exact:true}).isChecked()){
+    const src=resolution.variants.find(v=>v.id==='webp').src;
+    await page.waitForFunction(({src,size})=>{const ref=document.querySelector('#referenceViewer'),viewer=document.querySelector('#viewer');return ref.src===src&&ref.data&&ref.image.naturalWidth===size&&ref.image.src.includes(src.replace('model.json','view-'))&&viewer.pitch===ref.data.pitch&&viewer.yaw===ref.frame*Math.PI*2/ref.data.frames.length;},{src,size:resolution.size});
    }
    assert.equal(await page.evaluate(()=>{const s=customElements.get('img-3d').statistics;return s.backend==='webgpu'?s.devices:s.contexts;}),1);count++;
    if(model.id==='watch'&&resolution.size===512&&variant.id==='baked-xuastc'){
-    const before=await page.evaluate(()=>document.querySelector('#viewer').yaw),box=await page.locator('#viewer canvas').boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+30,box.y+box.height/2);await page.mouse.up();assert(Math.abs(await page.evaluate(()=>document.querySelector('#viewer').yaw)-before)>.1,'First drag leaving XUASTC reference was lost');await page.getByLabel('Reference',{exact:true}).check();
+    const before=await page.evaluate(()=>document.querySelector('#viewer').yaw),box=await page.locator('#viewer canvas').boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+30,box.y+box.height/2);await page.mouse.up();await page.waitForFunction(before=>Math.abs(document.querySelector('#viewer').yaw-before)>.1,before);assert.equal(await page.evaluate(()=>document.querySelector('#viewer').yaw===document.querySelector('#referenceViewer').frame*Math.PI/16),true,'Dragging the 3D pane did not match the WebP frame');assert.equal(await page.getByLabel('Reference',{exact:true}).isChecked(),true);assert.equal(await page.evaluate(()=>document.querySelector('#viewer').pitch),.2);
    }
   }
   assert.equal(count,50,'Expected5 models ×2 sizes ×5 appearances');
-  assert.equal(await page.locator('#turntable').isVisible(),true);assert.equal(await page.getByLabel('Move light',{exact:true}).isEnabled(),false);
+  assert.equal(await page.locator('#turntable').isVisible(),true);assert.equal(await page.getByLabel('Move light',{exact:true}).isVisible(),false);
   const frame=await page.evaluate(()=>document.querySelector('#turntable').frame);await page.locator('#turntable img').press('ArrowRight');await page.waitForFunction(frame=>document.querySelector('#turntable').frame===(frame+1)%32,frame);
   assert.equal(await page.evaluate(()=>document.querySelector('#turntable').pitch),.2);
+  const webpImage=page.locator('#turntable img'),webpBox=await webpImage.boundingBox(),beforeWebp=await page.evaluate(()=>({yaw:document.querySelector('#turntable').yaw,frame:document.querySelector('#turntable').frame}));
+  await page.mouse.move(webpBox.x+webpBox.width/2,webpBox.y+webpBox.height/2);await page.mouse.down();await page.mouse.move(webpBox.x+webpBox.width/2+60,webpBox.y+webpBox.height/2+90,{steps:5});await page.mouse.up();
+  await page.waitForFunction(frame=>document.querySelector('#turntable').frame!==frame,beforeWebp.frame);
+  const afterWebp=await page.evaluate(()=>({yaw:document.querySelector('#turntable').yaw,pitch:document.querySelector('#turntable').pitch}));assert(Math.abs(afterWebp.yaw-beforeWebp.yaw+.6)<1e-6,'Diagonal WebP drag ignored horizontal movement');assert.equal(afterWebp.pitch,.2);
+
   const checkGridSources=async tag=>{
    assert.equal(await page.locator('#grid '+tag).count(),120);
    assert.equal(await page.locator('#grid figure').count(),120);
-   assert.equal(await page.getByLabel('Model',{exact:true}).isEnabled(),false);assert.equal(await page.getByLabel('Item size',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Follow mouse',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Model',{exact:true}).evaluate(el=>getComputedStyle(el).borderStyle),'dashed');
+   assert.equal(await page.getByLabel('Model',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Item size',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Follow mouse',{exact:true}).isEnabled(),true);
    const actual=await page.locator('#grid '+tag).evaluateAll(tiles=>tiles.map(el=>({model:el.dataset.model,src:el.src})));
    const size=Number(await page.getByLabel('Resolution',{exact:true}).inputValue()),mode=await page.getByLabel('Appearance',{exact:true}).inputValue();
    assert.deepEqual(actual,Array.from({length:120},(_,i)=>{const m=catalog[i%catalog.length];return{model:m.id,src:m.resolutions.find(r=>r.size===size).variants.find(v=>v.id===mode).src};}));
@@ -135,7 +154,7 @@ test('one comparison page switches models, resolutions, appearance, references a
   await page.setViewportSize({width:700,height:600});
   await page.locator('#grid img-3d').last().scrollIntoViewIfNeeded();await page.waitForFunction(()=>document.querySelector('#grid figure:last-child img-3d')?.data);
   const result=await page.evaluate(()=>({contexts:(s=>s.backend==='webgpu'?s.devices:s.contexts)(customElements.get('img-3d').statistics),format:document.querySelector('#grid figure:last-child img-3d').textureFormat}));assert.equal(result.contexts,1);assert(['astc','bc7','rgba'].includes(result.format));
-  await page.evaluate(()=>scrollTo(0,0));await page.getByLabel('Grid',{exact:true}).uncheck();await page.setViewportSize({width:1200,height:900});await page.waitForFunction(()=>document.querySelector('#viewer')?.data);assert.equal(await page.locator('#grid figure').count(),0);assert.equal(await page.getByLabel('Model',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Item size',{exact:true}).isEnabled(),false);assert.equal(await page.getByLabel('Follow mouse',{exact:true}).isEnabled(),false);
+  await page.evaluate(()=>scrollTo(0,0));await page.getByLabel('Grid',{exact:true}).uncheck();await page.setViewportSize({width:1200,height:900});await page.waitForFunction(()=>document.querySelector('#viewer')?.data);assert.equal(await page.locator('#grid figure').count(),0);assert.equal(await page.getByLabel('Model',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Item size',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Follow mouse',{exact:true}).isVisible(),false);
   await page.getByLabel('Reference',{exact:true}).uncheck();await page.locator('#viewer canvas').press('ArrowRight');await page.getByRole('button',{name:'Reset view'}).click();assert.equal(await page.evaluate(()=>document.querySelector('#viewer').yaw),.55);
   await page.getByLabel('Appearance',{exact:true}).selectOption('baked');await page.waitForFunction(()=>document.querySelector('#viewer')?.data?.appearance==='baked');
   await page.screenshot({path:resolve(screenshots,'comparison.png')});assert.deepEqual(errors,[]);assert.deepEqual(missing,[],'Demo requested missing assets');

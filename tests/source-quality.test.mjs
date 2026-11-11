@@ -14,6 +14,7 @@ import {computeSilhouetteError,computeForegroundRenderError} from './support/imp
 import {useBackend} from './backends.mjs';
 
 const root=resolve('demo/public');let available=true;try{await access(resolve(root,'comparison.json'));}catch{available=false;}
+const qualityRoot=resolve('tests/fixtures/quality'),quality=JSON.parse(await readFile(resolve(qualityRoot,'catalog.json'),'utf8'));
 function measure(actual,reference,width,height){
  const mask=data=>{const m=new Uint8Array(width*height);for(let p=0;p<m.length;p++)m[p]=data[p*4+3]>127;return m;};
  const a=mask(actual),b=mask(reference);
@@ -26,7 +27,7 @@ test('WebGPU renders stay within the previous renderer’s source-quality scores
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/'){res.setHeader('Content-Type','text/html');res.end(`<!doctype html><style>body{margin:0}img-3d{display:block;width:${url.searchParams.get('size')}px;height:${url.searchParams.get('size')}px}</style><img-3d></img-3d><script type="module" src="/runtime.js"></script>`);return;}
   if(url.pathname==='/runtime.js'){res.setHeader('Content-Type','text/javascript');res.end(runtime);return;}
-  const path=resolve(root,'.'+url.pathname);if(!path.startsWith(root+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':'application/octet-stream');res.end(await readFile(path));
+  const fixture=url.pathname.startsWith('/quality/'),base=fixture?qualityRoot:root,path=resolve(base,'.'+(fixture?url.pathname.slice('/quality'.length):url.pathname));if(!path.startsWith(base+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':'application/octet-stream');res.end(await readFile(path));
  }catch{res.statusCode=404;res.end();}});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));
  const browser=await chromium.launch({channel:'chrome',headless:true}),failures=[],scored=new Map();
@@ -35,16 +36,17 @@ test('WebGPU renders stay within the previous renderer’s source-quality scores
    const page=await browser.newPage({viewport:{width:640,height:640},deviceScaleFactor:dpr}),errors=[];page.on('pageerror',e=>errors.push(String(e)));await useBackend(page,'webgpu');
    await page.goto(`http://127.0.0.1:${server.address().port}/?size=${css}`);await page.waitForFunction(()=>customElements.get('img-3d'));
    for(const model of catalog)for(const resolution of model.resolutions){
-    for(const [appearance,src] of [['baked','/'+resolution.losslessBaked],['pbr','/'+resolution.variants.find(v=>v.id==='pbr').src]]){
+    const fixture=quality[model.id+'-'+resolution.size];
+    for(const [appearance,src] of [['baked','/quality/'+fixture.losslessBaked],['pbr','/'+resolution.variants.find(v=>v.id==='pbr').src]]){
      const expected=baseline.rows.find(r=>r.mode===mode&&r.model===model.id&&r.size===resolution.size&&r.appearance===appearance);assert(expected,`No baseline for ${mode} ${model.id} ${resolution.size} ${appearance}`);
      await page.evaluate(src=>new Promise((done,fail)=>{const el=document.querySelector('img-3d');el.addEventListener('load',done,{once:true});el.addEventListener('error',e=>fail(String(e.detail)),{once:true});el.src=src;}),src);
      const scores=[];
      for(const index of baseline.views){
-      const [yaw,pitch]=resolution.views[index];
+      const [yaw,pitch]=fixture.views[index];
       // Read right after drawing: a presented WebGPU canvas reads back blank.
       const url=await page.evaluate(async([yaw,pitch])=>{const el=document.querySelector('img-3d');el.yaw=yaw;el.pitch=pitch;el.distance=4;el.lighting=null;await el.draw();return el.canvas.toDataURL();},[yaw,pitch]);
       const {data:actual,info}=await sharp(Buffer.from(url.split(',')[1],'base64')).ensureAlpha().raw().toBuffer({resolveWithObject:true});
-      let reference=await readFile(resolve(root,resolution.referencePrefix+index+'.png'));
+      let reference=await readFile(resolve(qualityRoot,fixture.referencePrefix+index+'.png'));
       if(mode==='card')reference=await sharp(reference).resize(info.width,info.height,{kernel:'cubic'}).png().toBuffer();
       let covered=0;for(let p=3;p<actual.length;p+=4)covered+=actual[p]>127;assert(covered>0,`Blank render: ${mode} ${model.id} ${resolution.size} ${appearance} view ${index}`);
       scores.push(measure(actual,(await sharp(reference).ensureAlpha().raw().toBuffer()),info.width,info.height));

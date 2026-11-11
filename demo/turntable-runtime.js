@@ -6,9 +6,9 @@ export class ImgTurntable extends HTMLElement {
  constructor(){
   super();this.ticket=0;this.attachShadow({mode:'open'}).innerHTML='<style>:host{display:inline-block;width:300px;height:300px}img{display:block;width:100%;height:100%;object-fit:contain;touch-action:pan-y pinch-zoom}</style><img draggable="false" tabindex="0" alt="32-view turntable. Drag or arrow keys rotate; Home resets.">';
   this.image=this.shadowRoot.querySelector('img');this.reset();
-  this.image.onpointerdown=e=>{this.pointer=[e.clientX,e.clientY];if(e.pointerType!=='touch'){e.preventDefault();this.image.focus({preventScroll:true});}this.image.setPointerCapture(e.pointerId);};
-  this.image.onpointermove=e=>{if(!this.pointer||Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;this.yaw-=(e.clientX-this.pointer[0])*.01;this.pointer=[e.clientX,e.clientY];this.draw();};
-  this.image.onpointerup=this.image.onpointercancel=()=>{this.pointer=null;};
+  this.image.onpointerdown=e=>{if(e.button!==0||!this.data)return;this.pointer={id:e.pointerId,x:e.clientX,yaw:this.yaw};if(e.pointerType!=='touch'){e.preventDefault();this.image.focus({preventScroll:true});}this.image.setPointerCapture(e.pointerId);};
+  this.image.onpointermove=e=>{if(this.pointer?.id!==e.pointerId)return;const yaw=this.pointer.yaw-(e.clientX-this.pointer.x)*.01;if(yaw===this.yaw)return;this.yaw=yaw;this.draw();};
+  this.image.onpointerup=this.image.onpointercancel=this.image.onlostpointercapture=()=>{this.pointer=null;};
   this.image.onkeydown=e=>{if(e.key==='Home')this.reset();else if(e.key==='ArrowLeft')this.yaw-=Math.PI/16;else if(e.key==='ArrowRight')this.yaw+=Math.PI/16;else return;e.preventDefault();this.draw();};
  }
  reset(){this.yaw=.55;this.pitch=.2;this.distance=4;this.draw();}
