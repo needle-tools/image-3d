@@ -64,7 +64,10 @@ The runtime consumes versioned captures. It owns its shader and interval
 refinement implementation; producers share the file contract rather than a
 runtime dependency. The standalone shader writer emits GLSL and WGSL at build
 time and is not shipped. Both backends draw compact twelve-triangle boxes and
-reconstruct depth in shaders, without surface meshes or geometry LODs.
+reconstruct depth in shaders, without surface meshes or geometry LODs. Depth is
+local to each rendered image: it resolves captured surfaces within that image,
+but does not add objects to a host scene, cast scene shadows or participate in
+a host renderer's reflection probes.
 
 ## Appearance and optional GPU compression
 
