@@ -17,6 +17,7 @@ const root=resolve(option('--root','demo/public')),pool=resolve(option('--pool',
 await mkdir(output,{recursive:true});
 const runtimes=Object.fromEntries([['current',option('--runtime','dist/img-3d.js')],['before',option('--before-runtime',null)]].filter(([,file])=>file));
 const modes=option('--modes','elements,canvas').split(','),seconds=Number(option('--seconds','3'));
+const lighting=option('--lighting','legacy');if(!['legacy','studio','presentation'].includes(lighting))throw Error('Choose legacy, studio or presentation for --lighting');
 const pose=option('--pose','rotate');if(!['rotate','stationary'].includes(pose))throw Error('Choose rotate or stationary for --pose');
 const manifest=JSON.parse(await readFile(resolve(pool,'manifest.json'),'utf8')),names=manifest.files.map(f=>f.name);
 if(names.length!==120||new Set(manifest.files.map(f=>f.sha256)).size!==120)throw Error('The benchmark needs 120 distinct captures; run unique-pool.mjs');
@@ -42,14 +43,15 @@ const elementPage=runtime=>`<!doctype html><meta charset="utf-8"><style>${style}
 <script type="module" src="/runtime-${runtime}.js"></script>
 <script type="module">
 ${light}
+${lighting==='legacy'?'':"const {loadStudio,studioLighting,presentationLighting}=await import('/root/runtime/lighting.js');const environment=await loadStudio();"}
 await customElements.whenDefined('img-3d');const tiles=[...document.querySelectorAll('img-3d')];
 await new Promise((done,fail)=>{const check=()=>{const bad=tiles.find(el=>el.status.textContent&&el.status.textContent!=='Loading…');if(bad||customElements.get('img-3d').statistics.validationErrors)return fail(Error(bad?.status.textContent||'GPU validation error'));tiles.every(el=>el.data)?done():setTimeout(check,50);};check();});
 tiles.forEach((el,i)=>{el.yaw=.55+i*.017;el.pitch=.2;});
-const tick=now=>{const direction=light(now);for(const el of tiles){el.yaw+=${pose==='rotate'?'.01':'0'};el.lighting={direction,intensity:2.5,ambient:1};}requestAnimationFrame(tick);};requestAnimationFrame(tick);
+const tick=now=>{const direction=light(now),lighting=${lighting==='legacy'?'{direction,intensity:2.5,ambient:1}':lighting==='studio'?'studioLighting(environment)':'presentationLighting(environment,now)'};for(const el of tiles){el.yaw+=${pose==='rotate'?'.01':'0'};el.lighting=lighting;}requestAnimationFrame(tick);};requestAnimationFrame(tick);
 window.frameCounter=()=>customElements.get('img-3d').statistics.viewRenders;
 window.cardCounts=()=>document.getElementById('one-canvas')?null:tiles.map(el=>window.diagnostic.per.get(el.canvas)||0);
 window.backendInfo=()=>{const s=customElements.get('img-3d').statistics;return{backend:s.backend,devices:s.devices,canvasContexts:s.canvasContexts};};
-window.residency=()=>{const s=customElements.get('img-3d').statistics;return{backend:s.backend,adapter:s.adapter,devices:s.devices,canvasContexts:s.canvasContexts,assets:s.assets,activeAssets:s.activeAssets,uniqueSources:new Set(tiles.map(el=>el.url)).size,uploads:s.decodes,textureBytes:s.textureBytes,contexts:s.contexts};};
+window.residency=()=>{const s=customElements.get('img-3d').statistics;return{backend:s.backend,adapter:s.adapter,devices:s.devices,canvasContexts:s.canvasContexts,assets:s.assets,activeAssets:s.activeAssets,uniqueSources:new Set(tiles.map(el=>el.url)).size,uploads:s.decodes,textureBytes:s.textureBytes,environmentBytes:s.environmentBytes,contexts:s.contexts};};
 window.ready=true;
 </script>`;
 function instrument(){
@@ -136,7 +138,7 @@ try{
   // No resource creation, uploads or compilation inside the measured window.
   const work=['texImage2D','texSubImage2D','texStorage2D','compressedTexImage2D','bufferData','compileShader','linkProgram','writeTexture','copyExternalImageToTexture','createTexture','createBuffer','createShaderModule','createRenderPipeline','createRenderPipelineAsync'].filter(name=>result.callsPerFrame[name]);
   if(work.length)throw Error('Uploads or compilation during the measured window: '+work.join(', '));
-  const row={mode,pose,runtime,runtimeSha256:runtime?createHash('sha256').update(runtimeCode[runtime]).digest('hex'):null,visible:120,distinctCaptures:120,independentResources:120,dpr:2,cardPixels:cell*2,...result,...after,uploadsWhileMeasuring:after.uploads===null?null:after.uploads-before.uploads};
+  const row={mode,pose,lighting,runtime,runtimeSha256:runtime?createHash('sha256').update(runtimeCode[runtime]).digest('hex'):null,visible:120,distinctCaptures:120,independentResources:120,dpr:2,cardPixels:cell*2,...result,...after,uploadsWhileMeasuring:after.uploads===null?null:after.uploads-before.uploads};
   results.push(row);console.log(JSON.stringify(row));await page.close();
  }
  await writeFile(resolve(output,'one-scene.json'),JSON.stringify({provenance:manifest.provenance,results},null,2));

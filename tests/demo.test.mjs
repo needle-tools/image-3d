@@ -37,11 +37,11 @@ test('one comparison page switches models, resolutions, appearance, references a
   assert.equal(await page.locator('#measurements').getAttribute('open'),null,'Measurements should start collapsed');
   await page.getByText('Measurements',{exact:true}).click();assert.match(await page.locator('#metrics').innerText(),/ASTC/,'Measured GPU format was hidden');await page.getByText('Measurements',{exact:true}).click();
   await page.getByLabel('Appearance',{exact:true}).selectOption('pbr');await page.waitForFunction(()=>document.querySelector('#viewer')?.data&&!document.querySelector('#viewer').data.appearance);
-  await page.getByLabel('Move light',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('#viewer').lighting.intensity===4);
+  await page.getByLabel('Move light',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('#viewer').lighting.lights?.length===3);
   assert.equal(await page.locator('#referenceFigure').isVisible(),false,'Moving light added an extra comparison pane');assert.equal(await page.getByLabel('Reference',{exact:true}).isVisible(),false);
   const sample=()=>page.evaluate(async()=>{const el=document.querySelector('#viewer');await el.draw();return [...(c=>{const copy=new OffscreenCanvas(c.width,c.height),x=copy.getContext('2d');x.drawImage(c,0,0);return x;})(el.canvas).getImageData(0,0,el.canvas.width,el.canvas.height).data];});
   const lit=await sample();await page.waitForTimeout(300);const moved=await sample();assert(lit.some((v,i)=>i%4!==3&&Math.abs(v-moved[i])>5),'Animated light did not visibly change the live view');
-  await page.getByLabel('Move light',{exact:true}).uncheck();assert.deepEqual(await page.evaluate(()=>document.querySelector('#viewer').lighting),{direction:[-.6,1,1],intensity:2.5,ambient:1});
+  await page.getByLabel('Move light',{exact:true}).uncheck();assert.deepEqual(await page.evaluate(()=>{const l=document.querySelector('#viewer').lighting;return{lights:l.lights,intensity:l.environmentIntensity,size:l.environment.size};}),{lights:[],intensity:1,size:32});
   const catalog=JSON.parse(await readFile(resolve(root,'comparison.json'),'utf8'));
   const viewerBytes=gzipSync(await readFile('dist/img-3d.js')).length;
   assert(catalog.every(m=>m.resolutions.every(r=>r.variants.filter(v=>v.id!=='webp'&&!v.id.endsWith('xuastc')).every(v=>v.runtimeGzip===viewerBytes))),'Comparison uses an outdated viewer size');
@@ -144,7 +144,7 @@ test('one comparison page switches models, resolutions, appearance, references a
   // The five 1024 live captures exceed the default cache: hovering must not
   // re-upload the same models on every move.
   await page.getByLabel('Appearance',{exact:true}).selectOption('pbr');await checkGridSources('img-3d');await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.data&&el.textureBytes>0;}));
-  await page.getByLabel('Move light',{exact:true}).check();await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.lighting.intensity===4;}));await page.getByLabel('Move light',{exact:true}).uncheck();assert(await page.locator('#grid img-3d').evaluateAll(tiles=>tiles.every(el=>el.lighting.intensity===2.5&&el.lighting.ambient===1)));
+  await page.getByLabel('Move light',{exact:true}).check();await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.lighting.lights?.length===3;}));await page.getByLabel('Move light',{exact:true}).uncheck();assert(await page.locator('#grid img-3d').evaluateAll(tiles=>tiles.every(el=>el.lighting.lights?.length===0&&el.lighting.environmentIntensity===1)));
   const uploads=await page.evaluate(()=>customElements.get('img-3d').statistics.decodes);
   for(const point of [[350,210],[650,230]]){await page.mouse.move(...point);await follows(point);await page.evaluate(()=>Promise.all([...document.querySelectorAll('#grid img-3d')].map(el=>el.draw())));}
   assert.equal(await page.evaluate(()=>customElements.get('img-3d').statistics.decodes),uploads,'Mixed-model hover thrashed the GPU cache');

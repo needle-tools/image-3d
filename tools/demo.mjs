@@ -9,6 +9,11 @@ for(const model of models)for(const resolution of model.resolutions)for(const va
 await mkdir(resolve(directory,'runtime'),{recursive:true});
 for(const name of ['img-3d.js','img-3d-xuastc.js'])await copyFile(resolve('dist',name),resolve(directory,'runtime',name));
 await copyFile(new URL('../demo/grid.js',import.meta.url),resolve(directory,'runtime/grid.js'));
+await copyFile(new URL('../LICENSES/three-MIT.txt',import.meta.url),resolve(directory,'runtime/three-MIT.txt'));
+await copyFile(new URL('../demo/lighting.js',import.meta.url),resolve(directory,'runtime/lighting.js'));
+await copyFile(new URL('../demo/studio.json.gz',import.meta.url),resolve(directory,'runtime/studio.env'));
+const environmentBytes=(await readFile(new URL('../demo/studio.json.gz',import.meta.url))).length+gzipSync(await readFile(new URL('../demo/lighting.js',import.meta.url))).length;
+for(const model of models)for(const resolution of model.resolutions)for(const variant of resolution.variants)if(variant.id.startsWith('pbr')){variant.totalGzip+=environmentBytes;variant.environmentBytes=environmentBytes;}
 for(const name of ['nunito-sans-latin.woff2','OFL.txt'])await copyFile(new URL('../demo/fonts/'+name,import.meta.url),resolve(directory,'runtime',name));
 const turntable=await build({entryPoints:['demo/turntable-runtime.js'],bundle:true,minify:true,format:'esm',write:false,target:'es2022'});
 await writeFile(resolve(directory,'runtime/turntable.js'),turntable.outputFiles[0].contents);
@@ -44,11 +49,11 @@ const html=`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="vie
 select:hover:not(:disabled),button:hover:not(:disabled){background:var(--surface-panel-muted)}button:active:not(:disabled){background:var(--surface-panel-strong)}#error{color:var(--accent-error)}
 @media(max-width:650px){body{padding:0 8px}.toolbar{gap:7px 10px}.toolbar:first-child{align-items:flex-end}.toolbar:first-child>.field{align-items:flex-start;flex-direction:column;gap:3px}h1{align-self:center}.gridToggle{margin-left:0}#stage.reference{grid-template-columns:1fr}#stage{margin:8px auto}img-3d,img-turntable{height:min(60vh,400px)}#grid{gap:4px}#gridSize{width:80px}}
 </style>
-<header><div class="toolbar"><h1>img-3d</h1><div class="field"><label for="model">Model</label><select id="model"></select></div><div class="field"><label for="resolution" title="3D atlas side or WebP frame side in pixels">Resolution</label><select id="resolution"></select></div><div class="field"><label for="appearance">Appearance</label><select id="appearance"></select></div><label class="gridToggle"><input id="many" type="checkbox">Grid</label></div><div class="toolbar"><button id="reset">Reset view</button><label title="Move the key light in live appearances. Turn off to restore the default lighting."><input id="light" type="checkbox">Move light</label><label><input id="reference" type="checkbox" title="Compare with the source-rendered 32-view WebP turntable">Reference</label><label><input id="follow" type="checkbox" checked disabled>Follow mouse</label><label id="gridSizeControl" for="gridSize">Item size<input id="gridSize" aria-label="Item size" type="range" min="80" max="360" step="20" value="180" disabled><output id="gridSizeValue" for="gridSize">180 px</output></label></div></header>
+<header><div class="toolbar"><h1>img-3d</h1><div class="field"><label for="model">Model</label><select id="model"></select></div><div class="field"><label for="resolution" title="3D atlas side or WebP frame side in pixels">Resolution</label><select id="resolution"></select></div><div class="field"><label for="appearance">Appearance</label><select id="appearance"></select></div><label class="gridToggle"><input id="many" type="checkbox">Grid</label></div><div class="toolbar"><button id="reset">Reset view</button><label title="Animate three studio lights. Turn off to restore the baked studio environment."><input id="light" type="checkbox">Move light</label><label><input id="reference" type="checkbox" title="Compare with the source-rendered 32-view WebP turntable">Reference</label><label><input id="follow" type="checkbox" checked disabled>Follow mouse</label><label id="gridSizeControl" for="gridSize">Item size<input id="gridSize" aria-label="Item size" type="range" min="80" max="360" step="20" value="180" disabled><output id="gridSizeValue" for="gridSize">180 px</output></label></div></header>
 <p id="error" role="alert" hidden></p>
 <div id="stage"><figure><img-3d id="viewer" aria-label="Interactive 3D capture"></img-3d><img-turntable id="turntable" hidden aria-label="32-view WebP turntable"></img-turntable></figure><figure id="referenceFigure" hidden><img-turntable id="referenceViewer" aria-label="32-view WebP reference"></img-turntable></figure></div>
 <div id="viewControls" hidden><label for="view">View</label><input id="view" type="range" min="0" max="31" value="0" step="1"><output id="viewNumber">1 / 32</output></div><div id="grid" hidden></div>
-<details id="measurements"><summary>Measurements</summary><div id="measurementScroll"><table><thead><tr><th>Appearance</th><th>Capture</th><th title="One viewer + one complete capture over gzip, including minimal HTML; WebP includes all 32 images">Total gzip</th><th title="Measured texture payload for 3D. WebP shows the decoded RGBA size of all 32 images, an estimate rather than measured browser residency. Excludes driver and raster-canvas overhead.">Textures / images</th><th title="Codec error only: 36 views for 3D or 32 captured angles for WebP. Does not measure angular stepping or source approximation.">Codec PSNR</th><th title="Lossless baked angular approximation versus full studio PBR; independent of codec error">Lighting match</th></tr></thead><tbody id="metrics"></tbody></table></div></details>
+<details id="measurements"><summary>Measurements</summary><div id="measurementScroll"><table><thead><tr><th>Appearance</th><th>Capture</th><th title="One viewer + one complete capture over gzip, including minimal HTML and the shared studio for live lighting; WebP includes all 32 images">Total gzip</th><th title="Measured texture payload for 3D. WebP shows the decoded RGBA size of all 32 images, an estimate rather than measured browser residency. Excludes driver and raster-canvas overhead.">Textures / images</th><th title="Codec error only: 36 views for 3D or 32 captured angles for WebP. Does not measure angular stepping or source approximation.">Codec PSNR</th><th title="Lossless baked angular approximation versus full studio PBR; independent of codec error">Lighting match</th></tr></thead><tbody id="metrics"></tbody></table></div></details>
 
 <script type="module">
 import './runtime/img-3d.js';
@@ -56,7 +61,7 @@ import {attachGridInteraction} from './runtime/grid.js';
 const models=${JSON.stringify(models).replaceAll('<','\\u003c')};
 if(models.some(m=>m.resolutions.some(r=>r.turntable)))await import('./runtime/turntable.js');
 const byId=id=>document.getElementById(id),model=byId('model'),resolution=byId('resolution'),appearance=byId('appearance'),viewer=byId('viewer'),turntable=byId('turntable'),light=byId('light'),many=byId('many'),reference=byId('reference'),grid=byId('grid'),stage=byId('stage'),view=byId('view'),gridSize=byId('gridSize');
-const bytes=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':(n/1000).toFixed(1)+' KB';let generation=0,decoder,tiles=[],animation=0,stageVisible=true,gridVisible=false;
+const bytes=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':(n/1000).toFixed(1)+' KB';let generation=0,decoder,lightingModule,studio,tiles=[],animation=0,stageVisible=true,gridVisible=false;
 const follow=byId('follow'),gridInteraction=attachGridInteraction(grid,()=>tiles);
 for(const m of models)model.add(new Option(m.label,m.id));
 function controls(){const m=models.find(m=>m.id===model.value),size=resolution.value,mode=appearance.value;resolution.replaceChildren(...m.resolutions.map(r=>new Option(String(r.size),String(r.size))));if(m.resolutions.some(r=>String(r.size)===size))resolution.value=size;const r=m.resolutions.find(r=>String(r.size)===resolution.value);appearance.replaceChildren(...r.variants.map(v=>new Option(v.name,v.id)));appearance.value=r.variants.some(v=>v.id===mode)?mode:'baked';}
@@ -99,8 +104,8 @@ function animate(){
  if(!light.checked||!appearance.value.startsWith('pbr')||document.hidden||!(many.checked?gridVisible:stageVisible))return;
  const frame=now=>{
   animation=requestAnimationFrame(frame);
-  const direction=[Math.sin(now*.00065)*1.2,1,Math.cos(now*.00065)*1.2],targets=many.checked?tiles.filter(el=>{const r=el.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight&&r.right>0&&r.left<innerWidth;}):[viewer];
-  for(const el of targets)el.lighting={direction,intensity:4,ambient:.3};
+  const lighting=lightingModule.presentationLighting(studio,now),targets=many.checked?tiles.filter(el=>{const r=el.getBoundingClientRect();return r.bottom>0&&r.top<innerHeight&&r.right>0&&r.left<innerWidth;}):[viewer];
+  for(const el of targets)el.lighting=lighting;
  };animation=requestAnimationFrame(frame);
 }
 const displayObserver=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.target===stage)stageVisible=entry.isIntersecting;else gridVisible=entry.isIntersecting;}animate();});displayObserver.observe(stage);displayObserver.observe(grid);
@@ -116,18 +121,20 @@ async function update(){
  byId('metrics').closest('table').querySelector('th').textContent=many.checked?'Model':'Appearance';
  for(const row of rows){const r=row,tr=document.createElement('tr');tr.className=!many.checked&&r.id===v.id?'selected':'';for(const text of [r.name,bytes(r.assetBytes),bytes(r.totalGzip),r.imageBytes?bytes(r.imageBytes)+' RGBA (all frames)':bytes(r.textureBytes)+' '+r.textureFormat.toUpperCase(),r.codecPsnr.toFixed(1)+' dB',r.lighting?r.lighting.meanPsnr.toFixed(1)+' dB':'—']){const td=document.createElement('td');td.textContent=text;tr.append(td);}byId('metrics').append(tr);}
  if(v.id.endsWith('xuastc')){decoder??=import('./runtime/img-3d-xuastc.js');await decoder;if(stamp!==generation)return;}
+ if(v.id.startsWith('pbr')){lightingModule??=await import('./runtime/lighting.js');studio??=await lightingModule.loadStudio();if(stamp!==generation)return;}
+ const liveLighting=v.id.startsWith('pbr')?lightingModule.studioLighting(studio):null;
  const moving=light.checked&&v.id.startsWith('pbr')&&!many.checked;
  stage.hidden=many.checked;grid.hidden=!many.checked;reference.disabled=many.checked||moving||isWebp;light.disabled=!v.id.startsWith('pbr');byId('viewControls').hidden=!reference.checked||many.checked||moving||isWebp;
  gridSize.disabled=follow.disabled=!many.checked;model.disabled=many.checked;model.title=many.checked?'Grid shows every model':'';
  const compare=reference.checked&&!many.checked&&!moving&&!isWebp;stage.classList.toggle('reference',compare);byId('referenceFigure').hidden=!compare;
  viewer.hidden=isWebp;turntable.hidden=!isWebp;
- viewer.lighting=null;
+ viewer.lighting=liveLighting;
  if(!compare)referenceViewer.removeAttribute('src');
  if(many.checked){
   viewer.removeAttribute('src');turntable.removeAttribute('src');
   const tag=isWebp?'img-turntable':'img-3d';if(tiles[0]?.localName!==tag){grid.replaceChildren();tiles=[];}
   if(!tiles.length)for(let i=0;i<120;i++){const {model}=gridModels[i%gridModels.length];const card=document.createElement('figure'),tile=document.createElement(tag),caption=document.createElement('figcaption');tile.setAttribute('aria-label',model.label);tile.dataset.model=model.id;tile.dataset.instance=String(i);caption.textContent=model.label;card.title=model.label;card.append(tile,caption);tiles.push(tile);grid.append(card);}
-  for(const [index,tile]of tiles.entries()){if(!isWebp)tile.lighting=null;const src=gridModels[index%gridModels.length].variant.src;if(tile.src!==src)tile.src=src;}
+  for(const [index,tile]of tiles.entries()){if(!isWebp)tile.lighting=liveLighting;const src=gridModels[index%gridModels.length].variant.src;if(tile.src!==src)tile.src=src;}
  }else{
   grid.replaceChildren();tiles=[];const other=isWebp?viewer:turntable;other.removeAttribute('src');if(el.src!==v.src)el.src=v.src;
   if(compare){referenceViewer.yaw=viewer.yaw;const src=r.variants.find(v=>v.id==='webp').src;if(referenceViewer.src!==src)referenceViewer.src=src;else referenceViewer.draw();}

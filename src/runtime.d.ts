@@ -2,16 +2,16 @@
 export declare class Img3d extends HTMLElement {
   static observedAttributes: string[];
   /** Shared renderer usage. WebGPU is preferred (one device; `contexts` counts WebGL contexts only). Entry/byte limits apply to inactive assets; visible assets stay resident. */
-  static readonly statistics: { backend:'webgpu'|'webgl2'|null; adapter:{vendor:string;architecture:string;description:string;fallback:boolean}|null; devices:number; canvasContexts:number; attachmentBytes:number; validationErrors:number; surfaceCaches:number; surfaceBytes:number; surfaceBuilds:number; surfaceReuses:number; viewRenders:number; contexts:number; assets:number; textureBytes:number; cachedBytes:number; activeAssets:number; inactiveAssets:number; activeTextureBytes:number; inactiveTextureBytes:number; activeCachedBytes:number; inactiveCachedBytes:number; renders:number; decodes:number; pending:number; fetching:number; entries:number; cpuBytes:number; gpuBytes:number };
+  static readonly statistics: { backend:'webgpu'|'webgl2'|null; adapter:{vendor:string;architecture:string;description:string;fallback:boolean}|null; devices:number; canvasContexts:number; attachmentBytes:number; environmentBytes:number; validationErrors:number; surfaceCaches:number; surfaceBytes:number; surfaceBuilds:number; surfaceReuses:number; viewRenders:number; contexts:number; assets:number; textureBytes:number; cachedBytes:number; activeAssets:number; inactiveAssets:number; activeTextureBytes:number; inactiveTextureBytes:number; activeCachedBytes:number; inactiveCachedBytes:number; renders:number; decodes:number; pending:number; fetching:number; entries:number; cpuBytes:number; gpuBytes:number };
   /** The single-file capture URL, including data URLs. */
   src: string;
   /** Uploaded texture payload; excludes driver overhead and raster canvases. */
   readonly textureBytes: number;
   readonly textureFormat: string | null;
   readonly transcodeMilliseconds: number;
-  /** Live PBR key direction/intensity and hemisphere strength; baked captures ignore these. */
-  get lighting(): {direction: number[]; intensity: number; ambient: number};
-  set lighting(value: {direction?: [number, number, number]; intensity?: number; ambient?: number} | null);
+  /** Live PBR lighting. The optional studio path uses ACES and up to three colored lights; baked captures ignore lighting. Environment data is immutable and shared across elements. */
+  get lighting(): {direction: number[]; intensity: number; ambient: number; lights?: Array<{direction:number[];color:number[];intensity:number}>;environment?:Img3dEnvironment;environmentIntensity?:number};
+  set lighting(value: {direction?: [number, number, number]; intensity?: number; ambient?: number;lights?:Array<{direction:[number,number,number];color?:[number,number,number];intensity?:number}>;environment?:Img3dEnvironment;environmentIntensity?:number} | null);
   readonly canvas: HTMLCanvasElement;
   yaw: number;
   pitch: number;
@@ -21,6 +21,8 @@ export declare class Img3d extends HTMLElement {
   /** Restore the initial orbit and zoom. */
   reset(): void;
 }
+/** Six octahedral roughness slices followed by a 16×16 BRDF integration table, linear RGBA16F. */
+export interface Img3dEnvironment {size:number;levels:number;data:Uint16Array}
 declare global {
   interface HTMLElementTagNameMap { 'img-3d': Img3d; }
 }

@@ -29,6 +29,12 @@ selected resolution. Drag either pane horizontally, or use its arrow keys, to
 rotate both views at matching cameras and a fixed elevation. Selecting **32 WebP
 views** under Appearance shows that same turntable on its own.
 
+**Live light** uses a compact capture of the same RoomEnvironment PMREM and ACES
+tone mapping as **Baked studio**. **Move light** adds three fast, saturated red,
+blue and magenta lights orbiting the product; turning it off restores the studio environment.
+The environment is shared across elements (about 35 KB compressed, 72 KB on the
+GPU). Six-view baked reflections remain an approximation of live reflections.
+
 `demo/public/` has one folder per model, resolution and representation:
 
 ```text
@@ -78,6 +84,10 @@ Both backends keep twelve triangles per box. Surface reconstruction stays in
 the shader. There are no generated surface meshes or geometry LODs. Automatic
 updates compare source, camera, size and lighting state; unchanged views stay
 idle. Explicit `draw()` refreshes the canvas for immediate pixel readback.
+
+Studio lighting filters subpixel normal detail into the specular roughness and
+resolves silhouette and color edges in a small postprocess. Lighting updates
+reuse captured intersections; anti-aliasing does not retrace the surface.
 
 ## Convert a capture
 
@@ -137,6 +147,7 @@ share world coordinates. The committed demo needs no regeneration.
 node tools/turntable.mjs source.glb capture.glb output-directory 512
 node tools/unique-pool.mjs
 node tools/one-scene.mjs --modes elements --pose rotate
+node tools/one-scene.mjs --modes elements --pose stationary --lighting presentation
 ```
 
 The last two commands derive 120 unique capture variants and measure their real

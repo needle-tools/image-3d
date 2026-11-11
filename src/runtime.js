@@ -1,4 +1,6 @@
+import {normalizeLighting,enhanced,lightingState,studioUniforms,studioShader} from './lighting.js';
 import {surfaceCrossingGlsl} from './surface-shader.js';
+import {antialiasShader} from './antialias.js';
 // MIT. A standalone bundle: no runtime imports, engine or external image decoder.
 const vertex = `#version 300 es
 precision highp float;
@@ -38,6 +40,10 @@ uniform int batchId;
 uniform bool cacheInput, cacheOutput;
 uniform ivec2 origin;
 uniform vec3 eye, forward;
+#ifdef STUDIO
+uniform sampler2D studioMap;
+uniform vec4 studioLights[6],environmentParams;
+#endif
 uniform vec3 lightDirection;
 uniform float lightIntensity, ambientIntensity;
 uniform float size, cutoff;
@@ -46,6 +52,9 @@ flat in int id;
 in vec3 world;
 in vec2 carrierUv;
 out vec4 outputColor;
+#ifdef STUDIO
+${studioShader(false)}
+#endif
 vec4 box(int i){return texelFetch(boxes,ivec2(i,id),0);}
 vec2 uvAt(vec3 p,vec3 r,vec3 u,vec4 rect){return (rect.xy+clamp(vec2(dot(p,r),dot(p,u))*.5+.5,0.,1.)*rect.zw)/size;}
 float depthAt(vec2 uv){vec2 d=textureLod(geometryMap,vec2(uv.x*.5,uv.y),0.).rg;return dot(d,vec2(65280.,255.))/65535.;}
@@ -223,6 +232,10 @@ void main(){
  hitNormal=normalize(transpose(inv)*(right*normal.x+up*normal.y+n*normal.z));
  if(dot(hitNormal,ray)>0.)hitNormal=-hitNormal;
  float rough=clamp(channel(hitUv,2)/coverage,.05,1.),metal=clamp(channel(hitUv,4)/coverage,0.,1.);
+#ifdef STUDIO
+ vec3 glow=emission?texture(colorMap,vec2((hitUv.x+1.)*.5,hitUv.y)).rgb/coverage:vec3(0);
+ outputColor=vec4(srgb(studioShade(hitNormal,-ray,base,rough,metal,clamp(channel(hitUv,3)/coverage,0.,1.),glow)),blended?texture(geometryMap,vec2((hitUv.x+1.)*.5,hitUv.y)).r:1.);
+#else
  vec3 N=hitNormal,V=-ray,L=normalize(lightDirection),H=normalize(V+L);
  float nl=max(dot(N,L),0.),nv=max(dot(N,V),.001),nh=max(dot(N,H),0.),vh=max(dot(V,H),0.);
  float a=rough*rough,a2=a*a,d=a2/(3.141593*pow(nh*nh*(a2-1.)+1.,2.));
@@ -233,6 +246,7 @@ void main(){
  vec3 color=ambient*ambientIntensity*(diffuse+f0*.5)*clamp(channel(hitUv,3)/coverage,0.,1.)+(diffuse/3.141593+F*d*g/max(4.*nv*nl,.001))*nl*lightIntensity;
  if(emission)color+=texture(colorMap,vec2((hitUv.x+1.)*.5,hitUv.y)).rgb/coverage;
  outputColor=vec4(srgb(color/(1.+color)),blended?texture(geometryMap,vec2((hitUv.x+1.)*.5,hitUv.y)).r:1.);
+#endif
  }
  #endif
  #endif
@@ -255,7 +269,7 @@ const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
 export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
 const elements=new Set(),pending=new Map(),cpu=new Map(),gpu=new Map(),uploads=new Map(),programs=new Map(),lastRendered=new WeakMap();
 const limits={entries:8,cpuBytes:32*1024*1024,gpuBytes:64*1024*1024};
-let surface,gl,depthBits,canCache=false,epoch=0,running=false,renders=0,contexts=0,decodes=0,surfaceBuilds=0,surfaceReuses=0,viewRenders=0;
+let surface,gl,depthBits,resolveTexture,canCache=false,epoch=0,running=false,renders=0,contexts=0,decodes=0,surfaceBuilds=0,surfaceReuses=0,viewRenders=0;
 const bytes=cache=>[...cache.values()].reduce((sum,r)=>sum+(r.bytes||0),0);
 const touch=(cache,key,value)=>{cache.delete(key);cache.set(key,value);return value;};
 const dispose=r=>{if(r.api)r.api.destroy(r);else for(const t of r.textures)gl?.deleteTexture(t);};
@@ -265,7 +279,7 @@ function trim(cache,budget,active=activeUrls()){
  const idle=inactive(cache,active);let count=idle.size,total=bytes(idle);
  for(const [key,r]of idle){if(count<=limits.entries&&total<=budget)break;cache.delete(key);count--;total-=r.bytes||0;if(cache===gpu)dispose(r);}
 }
-function trimCaches(){const active=activeUrls();trim(cpu,limits.cpuBytes,active);trim(gpu,limits.gpuBytes,active);}
+function trimCaches(){const active=activeUrls();trim(cpu,limits.cpuBytes,active);trim(gpu,limits.gpuBytes,active);const environments=new Set([undefined,...[...elements].filter(el=>el.visible&&el.data?.appearance!=='baked').map(el=>el.lighting.environment)]);for(const [e,t]of studioTextures)if(!environments.has(e)){gl?.deleteTexture(t);studioTextures.delete(e);}api?.trimEnvironments(environments);}
 function cacheCapabilities(){
  depthBits=gl.getParameter(gl.DEPTH_BITS);
  // Cache ownership must preserve the destination's depth ties.
@@ -278,7 +292,7 @@ let api=null,choosing=null;
 function backend(){
  return choosing??=(navigator.gpu?createGpu().catch(error=>{console.warn('img-3d uses WebGL: '+error.message);return null;}):Promise.resolve(null)).then(chosen=>{
   api=chosen;chosen?.device.lost.then(()=>{
-   if(api!==chosen)return;epoch++;for(const upload of uploads.values())upload.abort.abort();uploads.clear();for(const el of pending.keys())cancel(el);
+   if(api!==chosen)return;epoch++;studioTextures.clear();for(const upload of uploads.values())upload.abort.abort();uploads.clear();for(const el of pending.keys())cancel(el);
    for(const r of gpu.values())r.disposed=true;gpu.clear();api=null;choosing=null;for(const el of elements)enqueue(el);
   });
   return chosen;
@@ -289,12 +303,23 @@ function context(){
  if(gl)return gl;
  surface=document.createElement('canvas');gl=surface.getContext('webgl2',{alpha:true,antialias:true});
  if(!gl)throw Error('WebGL 2 unavailable');contexts++;cacheCapabilities();
- surface.addEventListener('webglcontextlost',e=>{e.preventDefault();epoch++;for(const upload of uploads.values())upload.abort.abort();uploads.clear();for(const el of pending.keys())cancel(el);for(const el of elements)dropSurface(el);gpu.clear();programs.clear();});
+ surface.addEventListener('webglcontextlost',e=>{e.preventDefault();epoch++;resolveTexture=null;studioTextures.clear();for(const upload of uploads.values())upload.abort.abort();uploads.clear();for(const el of pending.keys())cancel(el);for(const el of elements)dropSurface(el);gpu.clear();programs.clear();});
  surface.addEventListener('webglcontextrestored',()=>{cacheCapabilities();for(const el of elements)enqueue(el);});
  return gl;
 }
+const studioTextures=new Map();
+function studioTexture(environment){
+ if(studioTextures.has(environment))return studioTextures.get(environment);
+ const size=environment?.size??2,levels=environment?.levels??2,texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,size*levels,size+16,0,gl.RGBA,gl.HALF_FLOAT,environment?.data??new Uint16Array(size*levels*(size+16)*4));
+ for(const p of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,p,gl.LINEAR);
+ for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);
+ studioTextures.set(environment,texture);return texture;
+}
 function clearCaches(){
- epoch++;for(const upload of uploads.values())upload.abort.abort();uploads.clear();integration.decoder?.dispose();for(const r of cpu.values())r.abort?.abort();cpu.clear();
+ if(resolveTexture)gl?.deleteTexture(resolveTexture.texture);resolveTexture=null;
+ for(const t of studioTextures.values())gl?.deleteTexture(t);studioTextures.clear();
+ epoch++;studioTextures.clear();for(const upload of uploads.values())upload.abort.abort();uploads.clear();integration.decoder?.dispose();for(const r of cpu.values())r.abort?.abort();cpu.clear();
  for(const r of gpu.values())dispose(r);gpu.clear();
  for(const p of programs.values())gl?.deleteProgram(p.program);programs.clear();api?.release();
 }
@@ -424,14 +449,16 @@ async function upload(url,signal){
  }catch(error){dispose({textures});throw error;}
 }
 function program(key){if(programs.has(key))return programs.get(key);
- const p=gl.createProgram();
- for(const [kind,source]of [[gl.VERTEX_SHADER,vertex],[gl.FRAGMENT_SHADER,key==='pbr'?fragment:fragment.replace('precision highp float;',`#define ${key.toUpperCase()}\nprecision highp float;`)]]){
+ const p=gl.createProgram(),define=key.startsWith('studio')?`STUDIO\n#define LIGHT_COUNT ${key.endsWith('3')?3:0}`:key.toUpperCase();
+ const vs=key==='resolve'?'#version 300 es\nvoid main(){gl_Position=vec4(float(gl_VertexID/2)*4.-1.,float(gl_VertexID%2)*4.-1.,0,1);}':vertex;
+ const fs=key==='resolve'?`#version 300 es\nprecision highp float;uniform sampler2D image;uniform vec4 area;out vec4 outputColor;${antialiasShader(false)}\nvoid main(){outputColor=resolvePixel(gl_FragCoord.xy);}`:key==='pbr'?fragment:fragment.replace('precision highp float;',`#define ${define}\nprecision highp float;`);
+ for(const [kind,source]of [[gl.VERTEX_SHADER,vs],[gl.FRAGMENT_SHADER,fs]]){
   const shader=gl.createShader(kind);gl.shaderSource(shader,source);gl.compileShader(shader);
   if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)){const message=gl.getShaderInfoLog(shader);gl.deleteShader(shader);gl.deleteProgram(p);throw Error(message);}
   gl.attachShader(p,shader);gl.deleteShader(shader);
  }
  gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS)){const message=gl.getProgramInfoLog(p);gl.deleteProgram(p);throw Error(message);}
- const locations={};for(const name of ['eye','right','up','forward','aspect','focal','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin'])locations[name]=gl.getUniformLocation(p,name);
+ const locations={};for(const name of ['eye','right','up','forward','aspect','focal','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','studioMap','studioLights','environmentParams','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin','image','area'])locations[name]=gl.getUniformLocation(p,name);
  const result={program:p,locations};programs.set(key,result);return result;
 }
 function dropSurface(el){
@@ -466,7 +493,8 @@ function surfaceCache(el,asset,w,h,opaque){
 function clear(w,h,x=0,y=0){gl.viewport(x,y,w,h);gl.enable(gl.SCISSOR_TEST);gl.scissor(x,y,w,h);gl.clearColor(0,0,0,0);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);}
 function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
  // Compile cache writes separately so forward PBR does not carry their branch.
- const {program:p,locations:u}=program(['baked','cache','reuse'].includes(mode)?mode:'pbr');
+ const light=el.lighting,studio=mode!=='baked'&&mode!=='cache'&&enhanced(light),key=studio?'studio'+(light.lights?.length?3:0):['baked','cache','reuse'].includes(mode)?mode:'pbr';
+ const {program:p,locations:u}=program(key);
  const eye=[Math.sin(el.yaw)*Math.cos(el.pitch)*el.distance,Math.sin(el.pitch)*el.distance,Math.cos(el.yaw)*Math.cos(el.pitch)*el.distance];
  const forward=unit(eye.map(x=>-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward);
  gl.useProgram(p);for(const [name,v]of Object.entries({eye,right,up,forward}))gl.uniform3fv(u[name],v);
@@ -476,6 +504,7 @@ function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
  gl.uniform1i(u.cacheInput,mode==='reuse');gl.uniform1i(u.cacheOutput,mode==='cache');gl.uniform2i(u.origin,x,y);
  gl.uniform1f(u.aspect,w/h);gl.uniform1f(u.focal,2.41421356);
  const bind=(texture,slot,name)=>{gl.activeTexture(gl.TEXTURE0+slot);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(u[name],slot);};
+ if(studio){const values=studioUniforms(light);gl.uniform4fv(u.studioLights,values.subarray(0,24));gl.uniform4fv(u.environmentParams,values.subarray(24));bind(studioTexture(light.environment),6,'studioMap');}
  bind(cache?.textures[0]??asset.textures[0],4,'hitMap');bind(cache?.textures[1]??asset.textures[0],5,'hitDepth');
  gl.enable(gl.DEPTH_TEST);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.depthFunc(gl.LEQUAL);
  for(const [batch,offset,count]of batches){
@@ -503,11 +532,23 @@ function copy(el,{x,y,w,h}){
  if(el.gpuContext)el.replaceCanvas();
  const ctx=el.canvasContext??=el.canvas.getContext('2d');ctx.clearRect(0,0,w,h);ctx.drawImage(surface,x,surface.height-y-h,w,h,0,0,w,h);renders++;
 }
+function resolveLive(finished){
+ const live=finished.filter(({view,asset})=>asset.data.appearance!=='baked'&&enhanced(view.el.lighting));if(!live.length)return;
+ const w=surface.width,h=surface.height;
+ if(!resolveTexture||resolveTexture.w!==w||resolveTexture.h!==h){
+  if(resolveTexture)gl.deleteTexture(resolveTexture.texture);resolveTexture={texture:gl.createTexture(),w,h};gl.bindTexture(gl.TEXTURE_2D,resolveTexture.texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+  for(const p of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,p,gl.LINEAR);
+  for(const p of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,p,gl.CLAMP_TO_EDGE);
+ }
+ gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,resolveTexture.texture);gl.copyTexSubImage2D(gl.TEXTURE_2D,0,0,0,0,0,w,h);
+ const {program:p,locations:u}=program('resolve');gl.useProgram(p);gl.uniform1i(u.image,0);gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.disable(gl.BLEND);
+ const seen=new Set();for(const {view}of live){if(seen.has(view.key))continue;seen.add(view.key);const {x,y,w,h}=view;gl.viewport(x,y,w,h);gl.scissor(x,y,w,h);gl.uniform4f(u.area,x,y,w,h);gl.drawArrays(gl.TRIANGLES,0,3);}
+}
 // Automatic updates compare rendered inputs, independent of what caused them.
 // Explicit draw() still refreshes the canvas for immediate pixel readback.
 function viewState(el,asset,w,h){
  const light=el.lighting;
- return[asset,el.generation,api??gl,epoch,el.canvas,w,h,el.yaw,el.pitch,el.distance,...(asset.data.appearance==='baked'?[]:[...light.direction,light.intensity,light.ambient])];
+ return[asset,el.generation,api??gl,epoch,el.canvas,w,h,el.yaw,el.pitch,el.distance,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
 }
 function sameView(el,state){const old=lastRendered.get(el);return old?.length===state.length&&state.every((value,i)=>Object.is(value,old[i]));}
 function dimensions(el){const ratio=Math.min(devicePixelRatio||1,2);return[Math.max(1,Math.round(el.clientWidth*ratio)),Math.max(1,Math.round(el.clientHeight*ratio))];}
@@ -532,7 +573,7 @@ function layout(){
   if(!job.ready)continue;
   const w=Math.max(1,Math.round(el.clientWidth*ratio)),h=Math.max(1,Math.round(el.clientHeight*ratio));
   if(!job.force&&job.asset&&!job.error&&sameView(el,viewState(el,job.asset,w,h))){pending.delete(el);job.resolve(false);continue;}
-  const key=JSON.stringify([el.url,el.yaw,el.pitch,el.distance,w,h,job.asset?.data.appearance==='baked'?null:el.lighting]),region=regions.get(key);
+  const key=JSON.stringify([el.url,el.yaw,el.pitch,el.distance,w,h,job.asset?.data.appearance==='baked'?null:lightingState(el.lighting)]),region=regions.get(key);
   if(region){views.push({el,job,key,...region});continue;}
   if(x&&x+w>Math.max(limit,w)){x=0;y+=row;row=0;}
   if(views.length&&y+h>limit)break;
@@ -597,6 +638,7 @@ async function pump(){
    }
    if(performance.now()-start>=12)break;
   }
+  resolveLive(finished);
   // Submit every view before copying: one shared GPU image, not a flush per card.
   for(const {view,asset,epoch:renderEpoch}of finished){
    const {el,job}=view;let success=false;
@@ -620,15 +662,14 @@ export class Img3d extends HTMLElement {
  static observedAttributes=['src'];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
-  return {backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length,attachmentBytes:api?.attachmentBytes??0,validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
+  return {backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length,attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
  }
  get textureBytes(){return gpu.get(this.url)?.bytes??0;}
  get textureFormat(){return gpu.get(this.url)?.textureFormat??null;}
  get transcodeMilliseconds(){return gpu.get(this.url)?.transcodeMilliseconds??0;}
  get lighting(){return this.light??{direction:[-.6,1,1],intensity:2.5,ambient:1};}
  set lighting(value){
-  const direction=value?.direction,scalar=(v,f,max)=>Number.isFinite(v)?Math.max(0,Math.min(max,v)):f;
-  this.light={direction:numbers(direction,3)&&Math.hypot(...direction)>1e-8?[...direction]:[-.6,1,1],intensity:scalar(value?.intensity,2.5,20),ambient:scalar(value?.ambient,1,4)};
+  const previous=this.light?.environment;this.light=normalizeLighting(value);if(previous!==this.light.environment)trimCaches();
   enqueue(this);
  }
  get src(){return this.getAttribute('src')??'';}

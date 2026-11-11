@@ -1,15 +1,19 @@
+import {enhanced,studioUniforms,studioShader} from './lighting.js';
 import {surfaceCrossingWgsl} from './surface-shader.js';
+import {antialiasShader} from './antialias.js';
 // MIT. Preferred img-3d backend. One shared GPUDevice renders every element of
 // a frame together: visibility and shading over one shared atlas (plus
 // translucent layers), then one GPU texture copy of each element's region into
 // that element's own WebGPU canvas. No 2D canvas work happens per frame.
 // Boxes stay at twelve triangles; captured surfaces are reconstructed in the
 // fragment shader. Depth-range textures accelerate traversal without meshing.
-const FOCAL=2.41421356,FRAME=11,STRIDE=20,SLOT=256,VIEW=224,ATLAS=4096;
+const FOCAL=2.41421356,FRAME=11,STRIDE=20,SLOT=512,VIEW=336,ATLAS=4096;
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],unit=v=>{const n=Math.hypot(...v);return v.map(x=>x/n);};
 const BLOCKS=[[4,4],[5,4],[5,5],[6,5],[6,6],[8,5],[8,6],[8,8],[10,5],[10,6],[10,8],[10,10],[12,10],[12,12]];
+// Texture preparation must leave room for input without changing captured data.
+const yieldTask=()=>globalThis.scheduler?.yield()??new Promise(resolve=>setTimeout(resolve,0));
 const shader=`
-struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,reserved:i32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f}
+struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,reserved:i32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f}
 @group(0) @binding(0) var boxes:texture_2d<f32>;
 @group(0) @binding(1) var geometryMap:texture_2d<f32>;
 @group(0) @binding(2) var colorMap:texture_2d<f32>;
@@ -20,6 +24,10 @@ struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,reserved:i32,light:
 @group(2) @binding(0) var visible:texture_2d<u32>;
 @group(2) @binding(1) var hits:texture_depth_2d;
 override baked:bool=false;
+override enhanced:bool=false;
+override moving:bool=false;
+@group(3) @binding(0) var studioMap:texture_2d<f32>;
+${studioShader(true)}
 // Face bases as arithmetic: dynamically indexed private arrays become
 // per-invocation memory on some backends.
 fn unitAxis(a:i32)->vec3f{return vec3f(f32(a==0),f32(a==1),f32(a==2));}
@@ -221,6 +229,7 @@ struct Visible{@location(0) id:u32,@builtin(frag_depth) depth:f32}
  base/=total;orm/=total;glow/=total;
  var N=normalize(normal);if(dot(N,ray)>0){N=-N;}
  let rough=clamp(orm.x,.05,1.);let metal=clamp(orm.z,0.,1.);
+ if(enhanced){return vec4f(srgb(studioShade(N,-ray,base,rough,metal,clamp(orm.y,0.,1.),glow))*alpha,alpha);}
  let V=-ray;let L=normalize(view.light);let H=normalize(V+L);
  let nl=max(dot(N,L),0.);let nv=max(dot(N,V),.001);let nh=max(dot(N,H),0.);let vh=max(dot(V,H),0.);
  let a=rough*rough;let a2=a*a;let d=a2/(3.141593*pow(nh*nh*(a2-1)+1,2.));
@@ -269,7 +278,8 @@ async function setup(device,format,features){
  const assetsLayout=device.createBindGroupLayout({entries:[{binding:0,visibility,texture:{sampleType:'unfilterable-float'}},...[1,2,3].map(binding=>({binding,visibility:GPUShaderStage.FRAGMENT,texture:{}})),{binding:4,visibility:GPUShaderStage.FRAGMENT,sampler:{}},{binding:5,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:'uint'}}]});
  const viewLayout=device.createBindGroupLayout({entries:[{binding:0,visibility,buffer:{hasDynamicOffset:true,minBindingSize:VIEW}}]});
  const auxLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:'uint'}},{binding:1,visibility:GPUShaderStage.FRAGMENT,texture:{sampleType:'depth'}}]});
- const layout=device.createPipelineLayout({bindGroupLayouts:[assetsLayout,viewLayout,auxLayout]}),module=device.createShaderModule({code:shader});
+ const studioLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}}]});
+ const layout=device.createPipelineLayout({bindGroupLayouts:[assetsLayout,viewLayout,auxLayout,studioLayout]}),module=device.createShaderModule({code:shader});
  // Invalid WGSL or pipelines must fail here, so the WebGL fallback is used
  // instead of drawing nothing; later validation errors are counted.
  const errors=(await module.getCompilationInfo()).messages.filter(m=>m.type==='error');if(errors.length)throw Error(errors[0].message);
@@ -280,10 +290,33 @@ async function setup(device,format,features){
  const vis=device.createRenderPipelineAsync({layout,primitive:{topology:'triangle-list',cullMode:'front'},
   vertex:{module,entryPoint:'vs'},
   fragment:{module,entryPoint:'vis',targets:[{format:'r32uint'}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less'}});
- const shading=(baked,blend)=>device.createRenderPipelineAsync({layout,primitive:{topology:'triangle-list'},vertex:{module,entryPoint:'screen'},
-  fragment:{module,entryPoint:'shade',constants:{baked:baked?1:0},targets:[{format,blend:blend?{color:{srcFactor:'one',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]}});
+ const shading=(baked,blend,enhanced=false,moving=false)=>device.createRenderPipelineAsync({layout,primitive:{topology:'triangle-list'},vertex:{module,entryPoint:'screen'},
+  fragment:{module,entryPoint:'shade',constants:{baked:baked?1:0,enhanced,moving},targets:[{format,blend:blend?{color:{srcFactor:'one',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]}});
  const reset=device.createRenderPipelineAsync({layout:'auto',primitive:{topology:'triangle-list'},vertex:{module,entryPoint:'screen'},fragment:{module,entryPoint:'clearVisibility',targets:[{format:'r32uint'}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'always'}});
  const [visible,clear,pbr,baked,pbrBlend,bakedBlend]=await Promise.all([vis,reset,shading(false,false),shading(true,false),shading(false,true),shading(true,true)]),pipelines={visible,clear,pbr,baked,pbrBlend,bakedBlend};
+ const [studio,studioBlend,cinematic,cinematicBlend]=await Promise.all([shading(false,false,true),shading(false,true,true),shading(false,false,true,true),shading(false,true,true,true)]);Object.assign(pipelines,{studio,studioBlend,cinematic,cinematicBlend});
+ const resolveModule=device.createShaderModule({code:`
+ struct View{padding:array<vec4f,12>,area:vec4f}
+ @group(0) @binding(0) var image:texture_2d<f32>;
+ @group(0) @binding(1) var linearSampler:sampler;
+ @group(1) @binding(0) var<uniform> view:View;
+ ${antialiasShader(true)}
+ @vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(f32(i/2u)*4-1,f32(i%2u)*4-1,0,1);}
+ @fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{return resolvePixel(p.xy);}`});
+ const resolveLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}}]});
+ const resolvePipeline=await device.createRenderPipelineAsync({layout:device.createPipelineLayout({bindGroupLayouts:[resolveLayout,viewLayout]}),vertex:{module:resolveModule,entryPoint:'vs'},fragment:{module:resolveModule,entryPoint:'fs',targets:[{format}]}});
+ const environments=new Map();
+ function studioBinding(light){
+  const e=light.environment;let record=environments.get(e);
+  if(!record){const size=e?.size??2,levels=e?.levels??2,data=e?.data??new Uint16Array(size*levels*(size+16)*4),texture=device.createTexture({size:[size*levels,size+16],format:'rgba16float',usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});
+   device.queue.writeTexture({texture},data,{bytesPerRow:size*levels*8},[size*levels,size+16]);
+   record={texture,group:device.createBindGroup({layout:studioLayout,entries:[{binding:0,resource:texture.createView()}]})};environments.set(e,record);
+  }
+  return record.group;
+ }
+ function shadePipeline(item,blend=false){
+  const light=item.el.lighting,key=item.asset.data.appearance==='baked'?'baked':enhanced(light)?light.lights?.length?'cinematic':'studio':'pbr';return pipelines[key+(blend?'Blend':'')];
+ }
  const targets=new Map(),pool=[],elementIds=new WeakMap();let tick=0,serial=0,retained=null;
  // Each translucent box retains its visibility for light-only updates.
  // Offscreen owners release it; inactive sizes expire after frame submission.
@@ -295,7 +328,8 @@ async function setup(device,format,features){
   t.used=tick;return t;
  }
  function evict(){for(const [key,t]of targets)if(tick-t.used>60||targets.size>16&&t.used<tick-1){for(const x of t.textures)x.destroy();targets.delete(key);}}
- function release(){retained=null;for(const t of atlas?.textures??[])t.destroy();atlas=null;for(const t of targets.values())for(const x of t.textures)x.destroy();targets.clear();for(const p of pool)p.buffer.destroy();pool.length=0;}
+ function trimEnvironments(active){for(const [e,r]of environments)if(!active.has(e)){r.texture.destroy();environments.delete(e);}}
+ function release(){for(const e of environments.values())e.texture.destroy();environments.clear();retained=null;for(const t of atlas?.textures??[])t.destroy();atlas=null;for(const t of targets.values())for(const x of t.textures)x.destroy();targets.clear();for(const p of pool)p.buffer.destroy();pool.length=0;}
  function forget(el){
   retained?.entries.delete(el);const owner=elementIds.get(el);
   for(const [key,t]of targets)if(t.owner===owner){for(const x of t.textures)x.destroy();targets.delete(key);}
@@ -303,16 +337,20 @@ async function setup(device,format,features){
  function pose(item){return{asset:item.asset,w:item.w,h:item.h,yaw:item.el.yaw,pitch:item.el.pitch,distance:item.el.distance,x:item.rect[0],y:item.rect[1]};}
  function same(item,old){return old&&old.asset===item.asset&&old.w===item.w&&old.h===item.h&&old.yaw===item.el.yaw&&old.pitch===item.el.pitch&&old.distance===item.el.distance;}
  function texture(asset,size,format,usage=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST){const t=device.createTexture({size,format,usage});asset.textures.push(t);return t;}
- function depthPyramid(asset,rgba,size){
+ async function depthPyramid(asset,rgba,size,changed){
+  let deadline=performance.now()+4;
   let width=2**Math.ceil(Math.log2(Math.max(1,Math.ceil(size/4)))),values=new Uint32Array(width*width).fill(65535);
   const levels=Math.log2(width)+1,t=device.createTexture({size:[width,width],format:'r32uint',mipLevelCount:levels,usage:GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST});asset.textures.push(t);
-  for(let y=0;y<Math.ceil(size/4);y++)for(let x=0;x<Math.ceil(size/4);x++){
-   let near=65535,far=0;
-   for(let j=Math.max(0,y*4-1);j<Math.min(size,y*4+5);j++)for(let i=Math.max(0,x*4-1);i<Math.min(size,x*4+5);i++){
-    const k=(j*size*2+i)*4;if(rgba[k+2]<=127)continue;
-    const z=rgba[k]*256+rgba[k+1];near=Math.min(near,z);far=Math.max(far,z);
+  for(let y=0;y<Math.ceil(size/4);y++){
+   if(y%4===0&&performance.now()>deadline){await yieldTask();changed();deadline=performance.now()+4;}
+   for(let x=0;x<Math.ceil(size/4);x++){
+    let near=65535,far=0;
+    for(let j=Math.max(0,y*4-1);j<Math.min(size,y*4+5);j++)for(let i=Math.max(0,x*4-1);i<Math.min(size,x*4+5);i++){
+     const k=(j*size*2+i)*4;if(rgba[k+2]<=127)continue;
+     const z=rgba[k]*256+rgba[k+1];near=Math.min(near,z);far=Math.max(far,z);
+    }
+    values[y*width+x]=(far<<16)|near;
    }
-   values[y*width+x]=(far<<16)|near;
   }
   for(let level=0;level<levels;level++){
    device.queue.writeTexture({texture:t,mipLevel:level},values,{bytesPerRow:width*4},[width,width]);asset.bytes+=values.byteLength;
@@ -333,10 +371,14 @@ async function setup(device,format,features){
  // Packed depth is not premultiplied. Binary support keeps filtered depth
  // within its min/max bounds; alpha preserves fractional attribute coverage.
  // Opacity rejects cutout texels, including the gutters around each face.
- function cover(rgba,size,batches){
+ async function cover(rgba,size,batches,changed){
+  let deadline=performance.now()+4;
   const width=size*2,cutoffs=new Float32Array(size*size).fill(2);
   for(const batch of batches){const cutoff=batch.blend?1/255:batch.cutoff;for(const box of batch.boxes)for(const [x0,y0,w,h]of box.v)for(let y=Math.max(0,y0-2);y<Math.min(size,y0+h+2);y++)cutoffs.fill(cutoff,y*size+Math.max(0,x0-2),y*size+Math.min(size,x0+w+2));}
-  for(let y=0;y<size;y++)for(let x=0;x<size;x++){const i=(y*width+x)*4;rgba[i+3]=rgba[i+2];if(rgba[i+size*4]/255<cutoffs[y*size+x]||rgba[i+2]<=127){rgba[i]=rgba[i+1]=rgba[i+2]=rgba[i+3]=0;}else rgba[i+2]=255;}
+  for(let y=0;y<size;y++){
+   if(y%16===0&&performance.now()>deadline){await yieldTask();changed();deadline=performance.now()+4;}
+   for(let x=0;x<size;x++){const i=(y*width+x)*4;rgba[i+3]=rgba[i+2];if(rgba[i+size*4]/255<cutoffs[y*size+x]||rgba[i+2]<=127){rgba[i]=rgba[i+1]=rgba[i+2]=rgba[i+3]=0;}else rgba[i+2]=255;}
+  }
  }
  async function upload(data,images,{changed,decoder}){
   const asset={data,textures:[],bytes:0,textureFormat:'rgba',transcodeMilliseconds:0},maps=[],geometryPages=[];
@@ -379,8 +421,8 @@ async function setup(device,format,features){
   if(data.batches.length>4096||data.batches.some(b=>b.boxes.length*6>=1<<20))throw Error('img-3d capture has too many batches or boxes for WebGPU');
   asset.batches=data.batches.map((batch,index)=>({...batch,index,frames:frames(batch)}));
    for(const [p,page]of data.pages.entries()){
-    const rgba=geometryPages[p],batches=asset.batches.filter(b=>b.page===p);cover(rgba,page.size,batches);
-    const ranges=depthPyramid(asset,rgba,page.size),t=texture(asset,[page.size*2,page.size],'rgba8unorm');
+    const rgba=geometryPages[p],batches=asset.batches.filter(b=>b.page===p);await cover(rgba,page.size,batches,changed);
+    const ranges=await depthPyramid(asset,rgba,page.size,changed),t=texture(asset,[page.size*2,page.size],'rgba8unorm');
     device.queue.writeTexture({texture:t},rgba,{bytesPerRow:page.size*8},[page.size*2,page.size]);asset.bytes+=rgba.length;maps[p][1]=t;
     batches.forEach((batch,i)=>{
      const values=new Float32Array(batch.boxes.length*STRIDE*4);
@@ -399,7 +441,7 @@ async function setup(device,format,features){
  const SEGMENT=256;
  function slot(frame,view,el,batch,page,clip,target=[0,0,1,1],source=[0,0,0,0]){
   const data=new ArrayBuffer(VIEW),f=new Float32Array(data),i=new Int32Array(data),u=new Uint32Array(data),light=el.lighting;
-  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index;u[45]=clip;f.set(target,48);f.set(source,52);
+  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index;u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);
   let segment=frame.segments.at(-1);
   if(!segment||segment.slots.length===SEGMENT){
    const k=frame.segments.length;if(!pool[k]){const buffer=device.createBuffer({size:SLOT*SEGMENT,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});pool[k]={buffer,group:device.createBindGroup({layout:viewLayout,entries:[{binding:0,resource:{buffer,size:VIEW}}]})};}
@@ -416,7 +458,7 @@ async function setup(device,format,features){
   for(const t of atlas?.textures??[])t.destroy();
   width=Math.max(width,atlas?.width??0);height=Math.max(height,atlas?.height??0);
   const make=(format,usage=GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING)=>device.createTexture({size:[width,height],format,usage});
-  const color=make(format,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC),id=make('r32uint'),depth=make('depth32float');
+  const color=make(format,GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC|GPUTextureUsage.TEXTURE_BINDING),id=make('r32uint'),depth=make('depth32float');
   atlas={width,height,textures:[color,id,depth],color,views:{color:color.createView(),id:id.createView(),depth:depth.createView()},read:aux(id,depth),clip:aux(none[0],depth),bytes:width*height*12};
   return atlas;
  }
@@ -444,13 +486,14 @@ async function setup(device,format,features){
   return true;
  }
  function carriers(frame,pass,item,draws,clip,source,target=item.rect){
-  const {el,asset,view}=item;
+  const {el,asset,view}=item;pass.setBindGroup(3,studioBinding({}));
   for(const [batch,first,count]of draws){
    const [uniforms,offset]=slot(frame,view,el,batch,asset.data.pages[batch.page],clip,target,source);
    pass.setBindGroup(0,batch.group);pass.setBindGroup(1,uniforms,[offset]);pass.draw(36,count,0,first);
   }
  }
  function screen(frame,pass,item,batches,target,source){
+  pass.setBindGroup(3,studioBinding(item.asset.data.appearance==='baked'?{}:item.el.lighting));
   for(const batch of batches){const [uniforms,offset]=slot(frame,item.view,item.el,batch,item.asset.data.pages[batch.page],0,target,source);pass.setBindGroup(0,batch.group);pass.setBindGroup(1,uniforms,[offset]);pass.draw(3);}
  }
  function submit(frame){
@@ -474,7 +517,7 @@ async function setup(device,format,features){
    }
    pass=encoder.beginRenderPass({colorAttachments:[{view:a.views.color,clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});
    pass.setBindGroup(2,a.read);
-   for(const item of items){region(pass,item.rect);pass.setPipeline(item.asset.data.appearance==='baked'?pipelines.baked:pipelines.pbr);screen(frame,pass,item,opaque(item),item.rect,[item.rect[0],item.rect[1],0,0]);}
+   for(const item of items){region(pass,item.rect);pass.setPipeline(shadePipeline(item));screen(frame,pass,item,opaque(item),item.rect,[item.rect[0],item.rect[1],0,0]);}
    pass.end();
    // Each translucent box, far to near, blends only its nearest captured layer
    // in front of the opaque surface: its own visibility pass, then one blend.
@@ -485,14 +528,20 @@ async function setup(device,format,features){
     pass.setPipeline(pipelines.visible);pass.setBindGroup(2,a.clip);carriers(frame,pass,item,[[batch,i,1]],1,[0,0,item.rect[0],item.rect[1]],[0,0,item.w,item.h]);pass.end();layer.pose=pose(item);
     }
     pass=encoder.beginRenderPass({colorAttachments:[{view:a.views.color,loadOp:'load',storeOp:'store'}]});
-    region(pass,item.rect);pass.setPipeline(item.asset.data.appearance==='baked'?pipelines.bakedBlend:pipelines.pbrBlend);pass.setBindGroup(2,layer.read);screen(frame,pass,item,[batch],item.rect,[0,0,0,0]);pass.end();
+    region(pass,item.rect);pass.setPipeline(shadePipeline(item,true));pass.setBindGroup(2,layer.read);screen(frame,pass,item,[batch],item.rect,[0,0,0,0]);pass.end();
    }
    const entries=new WeakMap();for(const item of items)entries.set(item.el,pose(item));retained={atlas:a,entries};
-   for(const item of items)encoder.copyTextureToTexture({texture:a.color,origin:[item.rect[0],item.rect[1]]},{texture:item.el.gpuContext.getCurrentTexture()},[item.w,item.h]);
+   const live=items.filter(item=>item.asset.data.appearance!=='baked'&&enhanced(item.el.lighting));
+   if(live.length){
+    if(!a.resolved){a.resolved=device.createTexture({size:[a.width,a.height],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});a.textures.push(a.resolved);a.bytes+=a.width*a.height*4;a.resolveGroup=device.createBindGroup({layout:resolveLayout,entries:[{binding:0,resource:a.color.createView()},{binding:1,resource:sampler}]});}
+    pass=encoder.beginRenderPass({colorAttachments:[{view:a.resolved.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});pass.setPipeline(resolvePipeline);pass.setBindGroup(0,a.resolveGroup);
+    for(const item of live){region(pass,item.rect);const batch=item.asset.batches[0],[uniforms,offset]=slot(frame,item.view,item.el,batch,item.asset.data.pages[batch.page],0,item.rect);pass.setBindGroup(1,uniforms,[offset]);pass.draw(3);}pass.end();
+   }
+   for(const item of items)encoder.copyTextureToTexture({texture:live.includes(item)?a.resolved:a.color,origin:[item.rect[0],item.rect[1]]},{texture:item.el.gpuContext.getCurrentTexture()},[item.w,item.h]);
   }
   for(const {buffer,slots}of frame.segments){const all=new Uint8Array(slots.length*SLOT);slots.forEach((s,i)=>all.set(new Uint8Array(s),i*SLOT));device.queue.writeBuffer(buffer,0,all);}
   device.queue.submit([encoder.finish()]);tick++;evict();
  }
- return{device,format,features,maxTexture:device.limits.maxTextureDimension2D,upload,destroy,frame,present,submit,release,forget,
-  get attachmentBytes(){return[...targets.values()].reduce((sum,t)=>sum+t.bytes,0)+(atlas?.bytes??0);},get validationErrors(){return validationErrors;}};
+ return{device,format,features,maxTexture:device.limits.maxTextureDimension2D,upload,destroy,frame,present,submit,release,forget,trimEnvironments,
+  get environmentBytes(){return [...environments.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0);},get attachmentBytes(){return[...targets.values()].reduce((sum,t)=>sum+t.bytes,0)+(atlas?.bytes??0);},get validationErrors(){return validationErrors;}};
 }

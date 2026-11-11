@@ -39,11 +39,15 @@ traces captured depth and selects the nearest supported surface, independently
 of the original projection/interpolation settings. Dithered opacity uses alpha
 blending. There are two appearance modes:
 
-- PBR attributes: a small GGX key light and hemisphere approximation, without
-  environment maps, shadows, transmission or Three.js's full PBR pipeline.
+- PBR attributes: a small GGX key light and hemisphere approximation by default,
+  without shadows, transmission or Three.js's full PBR pipeline.
   Set `element.lighting = { direction: [1, 1, 0], intensity: 4, ambient: 0.3 }`
   to relight and redraw that element. Set it to `null` to restore the default
   key `[-0.6, 1, 1]`, intensity `2.5` and hemisphere strength `1`.
+  Optional `environment` and `lights` fields enable prefiltered studio IBL,
+  ACES tone mapping and up to three colored directional lights. Static IBL and
+  moving-light shaders are separate variants; the default and baked paths do not
+  evaluate those lighting terms.
 - Baked studio radiance: outgoing color from the workbench's studio PMREM with
   fixed ACES tone mapping, captured in six orthographic directions per box.
   Supported nearby surfaces blend with directional weights. Normals, material
@@ -118,6 +122,36 @@ memory proportional to element size and pixel density, like decoded images.
 `Img3d.statistics` reports shared counts and payload bytes. Instance getters
 `textureBytes`, `textureFormat` and `transcodeMilliseconds` describe the current
 resident capture; payload bytes exclude driver and raster-canvas overhead.
+
+The optional studio lighting object uses:
+
+```js
+element.lighting = {
+  environment: { size: 32, levels: 6, data: prefilteredRgba16f },
+  environmentIntensity: 1,
+  lights: [
+    { direction: [1, 1, 0], color: [1, 0.78, 0.52], intensity: 12 },
+    { direction: [-1, 0.2, 1], color: [0.22, 0.55, 1], intensity: 7 },
+    { direction: [0, 1, -1], color: [0.65, 0.85, 1], intensity: 18 }
+  ]
+};
+```
+
+Use `lights: []` for environment-only lighting. Environment `data` is an immutable
+`Uint16Array` of linear half-float RGBA pixels: `size * levels` columns and
+`size + 16` rows. The top `size` rows hold side-by-side octahedral radiance slices
+at evenly spaced roughness levels; the bottom-left 16×16 pixels hold the
+roughness/N·V BRDF integration table. The same environment object shares one GPU
+texture across elements. `statistics.environmentBytes` reports this shared memory.
+The demo's `lighting.js` loads its compressed asset with native browser APIs;
+`node tools/export-studio.mjs` regenerates it from the shared studio generator.
+
+Studio lighting integrates screen-space normal variance into specular roughness
+to reduce shimmering highlights. A shared edge-directed resolve filters color
+and silhouette coverage after shading, without additional surface traces.
+Samples clamp to each element's atlas region. Silhouette filtering depends on
+alpha rather than lighting, so moving a light does not change opacity. Baked
+and legacy lighting retain their existing rendering paths.
 
 Automatic updates compare the source, camera pose, physical canvas size,
 renderer generation and lighting values with the last rendered state. Equivalent
