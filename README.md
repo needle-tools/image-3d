@@ -29,6 +29,14 @@ selected resolution. Drag either pane horizontally, or use its arrow keys, to
 rotate both views at matching cameras and a fixed elevation. Selecting **32 WebP
 views** under Appearance shows that same turntable on its own.
 
+The address follows the demo settings and camera, so copying it reproduces the
+view. For example, `?model=watch&resolution=1024&appearance=pbr&light=1` opens
+the watch with moving lights. `grid`, `reference`, `follow` and `measurements`
+accept `1` or `0`; `size` sets the grid item width, and `yaw`, `pitch` and
+`distance` set the camera. Default values are omitted. Browser Back and Forward
+restore control changes. Grid cursor-following and temporary drag gestures
+remain local to the page.
+
 **Live light** uses a compact capture of the same RoomEnvironment PMREM and ACES
 tone mapping as **Baked studio**. **Move light** adds three fast, saturated red,
 blue and magenta lights orbiting the product; turning it off restores the studio environment.
