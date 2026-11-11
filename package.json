@@ -35,7 +35,9 @@
   ],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "dev": "npm run build && node tools/demo.mjs && vite preview --config demo/vite.config.js",
+    "build:demo": "npm run build && node tools/demo.mjs",
+    "deploy": "npm run build:demo && npx --yes needle-cloud deploy demo/public --team Needle --name \"Box Imposters Runtime\"",
+    "dev": "npm run build:demo && vite preview --config demo/vite.config.js",
     "convert": "node tools/export.mjs",
     "validate": "node tools/validate.mjs",
     "matrix": "node tools/matrix.mjs",
@@ -44,7 +46,7 @@
     "gpu:install": "npm install --no-save webgpu",
     "prepare": "npm run build",
     "prepack": "npm run build",
-    "pretest": "npm run build && node tools/demo.mjs"
+    "pretest": "npm run build:demo"
   },
   "devDependencies": {
     "@gltf-transform/core": "4.4.2",
