@@ -5,6 +5,14 @@ export declare class Img3d extends HTMLElement {
   static readonly statistics: { backend:'webgpu'|'webgl2'|null; adapter:{vendor:string;architecture:string;description:string;fallback:boolean}|null; devices:number; canvasContexts:number; attachmentBytes:number; environmentBytes:number; validationErrors:number; surfaceCaches:number; surfaceBytes:number; surfaceBuilds:number; surfaceReuses:number; viewRenders:number; contexts:number; assets:number; textureBytes:number; cachedBytes:number; activeAssets:number; inactiveAssets:number; activeTextureBytes:number; inactiveTextureBytes:number; activeCachedBytes:number; inactiveCachedBytes:number; renders:number; decodes:number; pending:number; fetching:number; entries:number; cpuBytes:number; gpuBytes:number };
   /** The single-file capture URL, including data URLs. */
   src: string;
+  /** Candidate widths are converter-measured usable frame pixels, not atlas sizes. */
+  srcset: string;
+  readonly currentSrc: string;
+  readonly naturalWidth: number;
+  readonly naturalHeight: number;
+  width: number;
+  height: number;
+  alt: string;
   /** Uploaded texture payload; excludes driver overhead and raster canvases. */
   readonly textureBytes: number;
   readonly textureFormat: string | null;
@@ -16,7 +24,7 @@ export declare class Img3d extends HTMLElement {
   yaw: number;
   pitch: number;
   distance: number;
-  /** Explicitly refresh and allow immediate canvas readback. */
+  /** Apply the requested pose immediately, finish camera easing, and allow canvas readback. */
   draw(): Promise<boolean>;
   /** Restore the initial orbit and zoom. */
   reset(): void;
@@ -32,3 +40,6 @@ export declare function registerImg3dDecoder(decoder: {
   decode(bytes: Uint8Array, target: {width: number; height: number; astc: boolean; bptc: boolean}): Promise<{data: Uint8Array; width: number; height: number; format: string; internalFormat?: number; milliseconds: number}>;
   dispose(): void;
 }): void;
+
+/** Enhance a native WebP img/picture using the browser's currentSrc; disconnect restores the original image. */
+export declare function enhanceImage(target:HTMLImageElement|HTMLPictureElement):{image:HTMLImageElement;element:Img3d;disconnect():void};

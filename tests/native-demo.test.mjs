@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {createServer} from 'node:http';
+import {readFile} from 'node:fs/promises';
+import {resolve,extname} from 'node:path';
+import {chromium} from '@playwright/test';
+
+test('comparison supports automatic resolution and native posters without losing camera state',{timeout:120000},async()=>{
+ const root=resolve('demo/public'),server=createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost'),path=resolve(root,'.'+(url.pathname==='/'?'/index.html':url.pathname));if(!path.startsWith(root+'/'))throw Error();res.setHeader('Cache-Control','public,max-age=3600');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':extname(path)==='.html'?'text/html':extname(path)==='.webp'?'image/webp':'application/octet-stream');res.end(await readFile(path));}catch{res.statusCode=404;res.end();}});await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({channel:'chrome',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1100,height:800},deviceScaleFactor:2}),errors=[],missing=[],requests=[];page.on('pageerror',e=>errors.push(String(e)));page.on('response',r=>{if(r.status()>=400)missing.push(r.url());});page.on('request',r=>requests.push(r.url()));await page.goto('http://127.0.0.1:'+server.address().port+'/?native=1&resolution=auto&yaw=1.1&pitch=.3&distance=4');
+  const ready=()=>page.waitForFunction(()=>document.querySelector('#nativePicture img-3d')?.data);await ready();
+  const sizing=await page.locator('#nativeImage').evaluate(img=>({hint:parseFloat(img.sizes),fitted:Math.min(img.clientWidth,img.clientHeight*Number(img.getAttribute('width'))/Number(img.getAttribute('height')))}));
+  assert(Math.abs(sizing.hint-sizing.fitted)<1,'Native source sizes used the element box instead of the contained image');
+  const raster=await page.locator('#nativePicture img-3d').evaluate(el=>[el.canvas.width,el.canvas.height,el.clientWidth,el.clientHeight]);assert.deepEqual(raster.slice(0,2),raster.slice(2).map(n=>n*2),'Retina overlay rendered below physical resolution');
+  assert.equal(await page.getByLabel('Resolution',{exact:true}).inputValue(),'auto');assert.deepEqual(await page.locator('#nativePicture img-3d').evaluate(el=>[el.yaw,el.pitch,el.distance]),[1.1,.3,4]);assert(requests.some(url=>url.endsWith('.webp')));assert(!requests.some(url=>url.endsWith('.i3d')),'Native startup fetched a redundant capture');
+  await page.getByLabel('Native image',{exact:true}).uncheck();await page.waitForFunction(()=>!document.querySelector('#viewer').hidden&&document.querySelector('#viewer').data);assert.deepEqual(await page.locator('#viewer').evaluate(el=>[el.yaw,el.pitch,el.distance]),[1.1,.3,4]);
+  await page.getByLabel('Native image',{exact:true}).check();await ready();assert.deepEqual(await page.locator('#nativePicture img-3d').evaluate(el=>[el.yaw,el.pitch,el.distance]),[1.1,.3,4]);
+  for(const mode of ['pbr','pbr-xuastc','baked','baked-xuastc']){await page.getByLabel('Appearance',{exact:true}).selectOption(mode);await page.waitForFunction(mode=>{const el=document.querySelector('#nativePicture img-3d');return el?.data&&el.currentSrc.includes(mode.startsWith('pbr')?'live':'baked')&&el.currentSrc.includes('xuastc')===mode.endsWith('xuastc');},mode);assert.equal(await page.locator('#nativeImage').evaluate(el=>el.style.visibility),'hidden');}
+  await page.getByLabel('Reference',{exact:true}).check();await page.waitForFunction(()=>{const ref=document.querySelector('#referenceViewer'),el=document.querySelector('#nativePicture img-3d');return ref?.data&&ref.frame!==undefined&&el.yaw===ref.frame*Math.PI/16;});await page.locator('#nativePicture img-3d canvas').press('ArrowRight');await page.waitForFunction(()=>{const ref=document.querySelector('#referenceViewer'),el=document.querySelector('#nativePicture img-3d');return el.yaw===ref.frame*Math.PI/16;});
+  await page.getByLabel('Reference',{exact:true}).uncheck();await page.getByLabel('Appearance',{exact:true}).selectOption('pbr');await page.getByLabel('Move light',{exact:true}).check();await page.waitForFunction(()=>document.querySelector('#nativePicture img-3d')?.lighting.lights?.length===3);await page.getByLabel('Move light',{exact:true}).uncheck();
+  await page.getByLabel('Grid',{exact:true}).check();await page.waitForFunction(()=>document.querySelectorAll('#grid img-3d').length===120&&[...document.querySelectorAll('#grid img-3d')].filter(el=>el.visible).every(el=>el.data));assert.equal(await page.getByLabel('Native image',{exact:true}).isVisible(),false);assert(await page.locator('#grid img-3d').evaluateAll(tiles=>tiles.every(el=>el.srcset.includes('w'))));
+  await page.getByLabel('Grid',{exact:true}).uncheck();await page.setViewportSize({width:390,height:800});await page.waitForFunction(()=>document.querySelector('#nativePicture img-3d')?.data);assert(await page.locator('#nativePicture').evaluate(el=>el.clientHeight<=400),'Native mobile view ignored the compact viewport height');
+  const stats=await page.evaluate(()=>customElements.get('img-3d').statistics);assert.equal(stats.devices,1);assert.equal(stats.validationErrors,0);assert.deepEqual(errors,[]);assert.deepEqual(missing,[]);
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+});

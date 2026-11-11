@@ -1,4 +1,4 @@
-export {Img3d,registerImg3dDecoder} from '../runtime.js';
+export {Img3d,registerImg3dDecoder,enhanceImage} from '../runtime.js';
 import {registerImg3dDecoder} from '../runtime.js';
 import {createTranscoder} from './decode.js';
 import wasm from './transcoder.wasm';

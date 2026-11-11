@@ -1,3 +1,4 @@
+import {cameraPose} from './camera-motion.js';
 import {enhanced,studioUniforms,studioShader} from './lighting.js';
 import {surfaceCrossingWgsl} from './surface-shader.js';
 import {antialiasShader} from './antialias.js';
@@ -13,7 +14,7 @@ const BLOCKS=[[4,4],[5,4],[5,5],[6,5],[6,6],[8,5],[8,6],[8,8],[10,5],[10,6],[10,
 // Texture preparation must leave room for input without changing captured data.
 const yieldTask=()=>globalThis.scheduler?.yield()??new Promise(resolve=>setTimeout(resolve,0));
 const shader=`
-struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,reserved:i32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f}
+struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f}
 @group(0) @binding(0) var boxes:texture_2d<f32>;
 @group(0) @binding(1) var geometryMap:texture_2d<f32>;
 @group(0) @binding(2) var colorMap:texture_2d<f32>;
@@ -197,7 +198,7 @@ struct Visible{@location(0) id:u32,@builtin(frag_depth) depth:f32}
  let r0=F(0);let r1=F(1);let r2=F(2);let T=mat3x3f(F(3).xyz,F(4).xyz,F(5).xyz);
  let c0=vec3f(r0.x,r1.x,r2.x);let c1=vec3f(r0.y,r1.y,r2.y);let c2=vec3f(r0.z,r1.z,r2.z);
  extent=2*vec3f(length(c0),length(c1),length(c2));a0=normalize(c0);a1=normalize(c1);a2=normalize(c2);
- cell=2*length(view.eye)/(${FOCAL}*view.area.w);
+ cell=2*length(view.eye)/(view.focal*view.area.w);
  let ray=normalize(world-view.eye);
  let c=max(coverage(own),1e-3);
  let alpha=covered*select(1.,min(textureSampleLevel(geometryMap,filtered,vec2f((own.x+1)*.5,own.y),0).r/c,1.),view.blended!=0);
@@ -259,11 +260,12 @@ function invert(m){
 }
 // The camera every backend shares: orbit eye, then WebGPU's 0..1 clip depth.
 export function camera(el,w,h){
- const eye=[Math.sin(el.yaw)*Math.cos(el.pitch)*el.distance,Math.sin(el.pitch)*el.distance,Math.cos(el.yaw)*Math.cos(el.pitch)*el.distance];
- const forward=unit(eye.map(x=>-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward),near=.01,far=100;
- const rows=[[...right.map(v=>v*FOCAL*h/w),-dot(right,eye)*FOCAL*h/w],[...up.map(v=>v*FOCAL),-dot(up,eye)*FOCAL],[...forward.map(v=>v*far/(far-near)),-dot(forward,eye)*far/(far-near)-far*near/(far-near)],[...forward,-dot(forward,eye)]];
+ const view=cameraPose(el),eye=[Math.sin(view.yaw)*Math.cos(view.pitch)*view.distance,Math.sin(view.pitch)*view.distance,Math.cos(view.yaw)*Math.cos(view.pitch)*view.distance];
+ const forward=unit(eye.map(x=>-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward),near=.01,far=100,layout=el.layout??{sx:h/w,sy:1,cx:0,cy:0},ratio=el.frameRatio??1;
+ const rows=[[...right.map(v=>v*FOCAL*layout.sx/ratio),-dot(right,eye)*FOCAL*layout.sx/ratio],[...up.map(v=>v*FOCAL*layout.sy),-dot(up,eye)*FOCAL*layout.sy],[...forward.map(v=>v*far/(far-near)),-dot(forward,eye)*far/(far-near)-far*near/(far-near)],[...forward,-dot(forward,eye)]];
+ for(let k=0;k<4;k++){rows[0][k]+=layout.cx*rows[3][k];rows[1][k]+=layout.cy*rows[3][k];}
  const matrix=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++)matrix[c*4+r]=rows[r][c];
- return{eye,matrix,inverse:invert(matrix),pixel:2*el.distance/(FOCAL*h)};
+ return{eye,matrix,inverse:invert(matrix),pixel:2*view.distance/(FOCAL*layout.sy*h),focal:FOCAL*layout.sy};
 }
 export async function createGpu(){
  const adapter=await navigator.gpu?.requestAdapter();if(!adapter)return null;
@@ -334,8 +336,8 @@ async function setup(device,format,features){
   retained?.entries.delete(el);const owner=elementIds.get(el);
   for(const [key,t]of targets)if(t.owner===owner){for(const x of t.textures)x.destroy();targets.delete(key);}
  }
- function pose(item){return{asset:item.asset,w:item.w,h:item.h,yaw:item.el.yaw,pitch:item.el.pitch,distance:item.el.distance,x:item.rect[0],y:item.rect[1]};}
- function same(item,old){return old&&old.asset===item.asset&&old.w===item.w&&old.h===item.h&&old.yaw===item.el.yaw&&old.pitch===item.el.pitch&&old.distance===item.el.distance;}
+ function pose(item){const view=cameraPose(item.el);return{asset:item.asset,w:item.w,h:item.h,yaw:view.yaw,pitch:view.pitch,distance:view.distance,layout:[...item.el.layoutSignature],x:item.rect[0],y:item.rect[1]};}
+ function same(item,old){const view=cameraPose(item.el);return old&&old.asset===item.asset&&old.w===item.w&&old.h===item.h&&old.yaw===view.yaw&&old.pitch===view.pitch&&old.distance===view.distance&&old.layout.every((v,i)=>v===item.el.layoutSignature[i]);}
  function texture(asset,size,format,usage=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST){const t=device.createTexture({size,format,usage});asset.textures.push(t);return t;}
  async function depthPyramid(asset,rgba,size,changed){
   let deadline=performance.now()+4;
@@ -441,7 +443,7 @@ async function setup(device,format,features){
  const SEGMENT=256;
  function slot(frame,view,el,batch,page,clip,target=[0,0,1,1],source=[0,0,0,0]){
   const data=new ArrayBuffer(VIEW),f=new Float32Array(data),i=new Int32Array(data),u=new Uint32Array(data),light=el.lighting;
-  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index;u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);
+  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f[35]=view.focal;f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index;u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);
   let segment=frame.segments.at(-1);
   if(!segment||segment.slots.length===SEGMENT){
    const k=frame.segments.length;if(!pool[k]){const buffer=device.createBuffer({size:SLOT*SEGMENT,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});pool[k]={buffer,group:device.createBindGroup({layout:viewLayout,entries:[{binding:0,resource:{buffer,size:VIEW}}]})};}

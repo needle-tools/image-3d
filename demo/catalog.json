@@ -18,11 +18,19 @@
             "codecPsnr": 44.69502321416539,
             "textureBytes": 5768960,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "owl-512-i3d/live.webp",
+              "width": 464,
+              "height": 872,
+              "effectiveWidth": 464,
+              "bytes": 556500,
+              "posterBytes": 35936
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "owl-512-i3d/live-xuastc.i3d",
             "assetBytes": 525165,
             "runtimeGzip": 175022,
@@ -33,7 +41,15 @@
             "codecPsnr": 40.69637970424792,
             "textureBytes": 4196096,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "owl-512-i3d/live-xuastc.webp",
+              "width": 464,
+              "height": 872,
+              "effectiveWidth": 464,
+              "bytes": 562284,
+              "posterBytes": 35930
+            }
           },
           {
             "id": "baked",
@@ -50,11 +66,19 @@
             "lighting": {
               "meanPsnr": 18.81683286709165,
               "minPsnr": 15.048359479220402
+            },
+            "image": {
+              "src": "owl-512-i3d/baked.webp",
+              "width": 464,
+              "height": 872,
+              "effectiveWidth": 464,
+              "bytes": 345470,
+              "posterBytes": 34934
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "owl-512-i3d/baked-xuastc.i3d",
             "assetBytes": 326608,
             "runtimeGzip": 175022,
@@ -68,6 +92,14 @@
             "lighting": {
               "meanPsnr": 18.81683286709165,
               "minPsnr": 15.048359479220402
+            },
+            "image": {
+              "src": "owl-512-i3d/baked-xuastc.webp",
+              "width": 464,
+              "height": 872,
+              "effectiveWidth": 464,
+              "bytes": 362882,
+              "posterBytes": 35102
             }
           },
           {
@@ -105,11 +137,19 @@
             "codecPsnr": 45.73426378396417,
             "textureBytes": 23070464,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "owl-1024-i3d/live.webp",
+              "width": 956,
+              "height": 1804,
+              "effectiveWidth": 956,
+              "bytes": 1847918,
+              "posterBytes": 107212
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "owl-1024-i3d/live-xuastc.i3d",
             "assetBytes": 1776980,
             "runtimeGzip": 175022,
@@ -120,7 +160,15 @@
             "codecPsnr": 41.69475173920651,
             "textureBytes": 16779008,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "owl-1024-i3d/live-xuastc.webp",
+              "width": 956,
+              "height": 1804,
+              "effectiveWidth": 956,
+              "bytes": 1885340,
+              "posterBytes": 107086
+            }
           },
           {
             "id": "baked",
@@ -137,11 +185,19 @@
             "lighting": {
               "meanPsnr": 19.510617816241975,
               "minPsnr": 16.536026294470755
+            },
+            "image": {
+              "src": "owl-1024-i3d/baked.webp",
+              "width": 956,
+              "height": 1804,
+              "effectiveWidth": 956,
+              "bytes": 1172478,
+              "posterBytes": 110802
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "owl-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 1164203,
             "runtimeGzip": 175022,
@@ -155,6 +211,14 @@
             "lighting": {
               "meanPsnr": 19.510617816241975,
               "minPsnr": 16.536026294470755
+            },
+            "image": {
+              "src": "owl-1024-i3d/baked-xuastc.webp",
+              "width": 956,
+              "height": 1804,
+              "effectiveWidth": 956,
+              "bytes": 1276166,
+              "posterBytes": 110668
             }
           },
           {
@@ -198,11 +262,19 @@
             "codecPsnr": 44.64791006291979,
             "textureBytes": 4720384,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "watch-512-i3d/live.webp",
+              "width": 576,
+              "height": 616,
+              "effectiveWidth": 576,
+              "bytes": 369684,
+              "posterBytes": 47926
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "watch-512-i3d/live-xuastc.i3d",
             "assetBytes": 326122,
             "runtimeGzip": 175022,
@@ -213,7 +285,15 @@
             "codecPsnr": 42.756707002679484,
             "textureBytes": 3790144,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "watch-512-i3d/live-xuastc.webp",
+              "width": 576,
+              "height": 616,
+              "effectiveWidth": 576,
+              "bytes": 376204,
+              "posterBytes": 48696
+            }
           },
           {
             "id": "baked",
@@ -230,11 +310,19 @@
             "lighting": {
               "meanPsnr": 15.03836576415218,
               "minPsnr": 12.628398609274429
+            },
+            "image": {
+              "src": "watch-512-i3d/baked.webp",
+              "width": 576,
+              "height": 616,
+              "effectiveWidth": 576,
+              "bytes": 236102,
+              "posterBytes": 48446
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "watch-512-i3d/baked-xuastc.i3d",
             "assetBytes": 248241,
             "runtimeGzip": 175022,
@@ -248,6 +336,14 @@
             "lighting": {
               "meanPsnr": 15.03836576415218,
               "minPsnr": 12.628398609274429
+            },
+            "image": {
+              "src": "watch-512-i3d/baked-xuastc.webp",
+              "width": 576,
+              "height": 616,
+              "effectiveWidth": 576,
+              "bytes": 298446,
+              "posterBytes": 48830
             }
           },
           {
@@ -285,11 +381,19 @@
             "codecPsnr": 41.47390234421617,
             "textureBytes": 18876160,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "watch-1024-i3d/live.webp",
+              "width": 1196,
+              "height": 1276,
+              "effectiveWidth": 1196,
+              "bytes": 816534,
+              "posterBytes": 126672
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "watch-1024-i3d/live-xuastc.i3d",
             "assetBytes": 714297,
             "runtimeGzip": 175022,
@@ -300,7 +404,15 @@
             "codecPsnr": 41.21155178640984,
             "textureBytes": 15149712,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "watch-1024-i3d/live-xuastc.webp",
+              "width": 1196,
+              "height": 1276,
+              "effectiveWidth": 1196,
+              "bytes": 842554,
+              "posterBytes": 126814
+            }
           },
           {
             "id": "baked",
@@ -317,11 +429,19 @@
             "lighting": {
               "meanPsnr": 15.254792634412825,
               "minPsnr": 12.324523590261279
+            },
+            "image": {
+              "src": "watch-1024-i3d/baked.webp",
+              "width": 1196,
+              "height": 1276,
+              "effectiveWidth": 1196,
+              "bytes": 666104,
+              "posterBytes": 135616
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "watch-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 744566,
             "runtimeGzip": 175022,
@@ -335,6 +455,14 @@
             "lighting": {
               "meanPsnr": 15.254792634412825,
               "minPsnr": 12.324523590261279
+            },
+            "image": {
+              "src": "watch-1024-i3d/baked-xuastc.webp",
+              "width": 1196,
+              "height": 1276,
+              "effectiveWidth": 1196,
+              "bytes": 881962,
+              "posterBytes": 135948
             }
           },
           {
@@ -378,11 +506,19 @@
             "codecPsnr": 42.264863282470095,
             "textureBytes": 4720384,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "decor-512-i3d/live.webp",
+              "width": 540,
+              "height": 580,
+              "effectiveWidth": 540,
+              "bytes": 359366,
+              "posterBytes": 23010
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "decor-512-i3d/live-xuastc.i3d",
             "assetBytes": 366270,
             "runtimeGzip": 175022,
@@ -393,7 +529,15 @@
             "codecPsnr": 41.47324853314907,
             "textureBytes": 3933952,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "decor-512-i3d/live-xuastc.webp",
+              "width": 540,
+              "height": 580,
+              "effectiveWidth": 540,
+              "bytes": 390790,
+              "posterBytes": 23224
+            }
           },
           {
             "id": "baked",
@@ -410,11 +554,19 @@
             "lighting": {
               "meanPsnr": 23.600711176054077,
               "minPsnr": 20.351078509956913
+            },
+            "image": {
+              "src": "decor-512-i3d/baked.webp",
+              "width": 540,
+              "height": 580,
+              "effectiveWidth": 540,
+              "bytes": 225426,
+              "posterBytes": 20134
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "decor-512-i3d/baked-xuastc.i3d",
             "assetBytes": 265306,
             "runtimeGzip": 175022,
@@ -428,6 +580,14 @@
             "lighting": {
               "meanPsnr": 23.600711176054077,
               "minPsnr": 20.351078509956913
+            },
+            "image": {
+              "src": "decor-512-i3d/baked-xuastc.webp",
+              "width": 540,
+              "height": 580,
+              "effectiveWidth": 540,
+              "bytes": 286680,
+              "posterBytes": 20080
             }
           },
           {
@@ -465,11 +625,19 @@
             "codecPsnr": 44.45979547314738,
             "textureBytes": 18876160,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "decor-1024-i3d/live.webp",
+              "width": 1088,
+              "height": 1172,
+              "effectiveWidth": 1088,
+              "bytes": 1048240,
+              "posterBytes": 59098
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "decor-1024-i3d/live-xuastc.i3d",
             "assetBytes": 995445,
             "runtimeGzip": 175022,
@@ -480,7 +648,15 @@
             "codecPsnr": 42.107103661292314,
             "textureBytes": 15149712,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "decor-1024-i3d/live-xuastc.webp",
+              "width": 1088,
+              "height": 1172,
+              "effectiveWidth": 1088,
+              "bytes": 1056102,
+              "posterBytes": 59294
+            }
           },
           {
             "id": "baked",
@@ -497,11 +673,19 @@
             "lighting": {
               "meanPsnr": 25.877873591181302,
               "minPsnr": 22.53303062966337
+            },
+            "image": {
+              "src": "decor-1024-i3d/baked.webp",
+              "width": 1088,
+              "height": 1172,
+              "effectiveWidth": 1088,
+              "bytes": 654560,
+              "posterBytes": 52382
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "decor-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 718756,
             "runtimeGzip": 175022,
@@ -515,6 +699,14 @@
             "lighting": {
               "meanPsnr": 25.877873591181302,
               "minPsnr": 22.53303062966337
+            },
+            "image": {
+              "src": "decor-1024-i3d/baked-xuastc.webp",
+              "width": 1088,
+              "height": 1172,
+              "effectiveWidth": 1088,
+              "bytes": 775576,
+              "posterBytes": 55448
             }
           },
           {
@@ -558,11 +750,19 @@
             "codecPsnr": 43.333027020850594,
             "textureBytes": 5768736,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "motorcycle-512-i3d/live.webp",
+              "width": 492,
+              "height": 524,
+              "effectiveWidth": 492,
+              "bytes": 462866,
+              "posterBytes": 29424
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "motorcycle-512-i3d/live-xuastc.i3d",
             "assetBytes": 408410,
             "runtimeGzip": 175022,
@@ -573,7 +773,15 @@
             "codecPsnr": 40.28483428192345,
             "textureBytes": 3906880,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "motorcycle-512-i3d/live-xuastc.webp",
+              "width": 492,
+              "height": 524,
+              "effectiveWidth": 492,
+              "bytes": 439638,
+              "posterBytes": 29880
+            }
           },
           {
             "id": "baked",
@@ -590,11 +798,19 @@
             "lighting": {
               "meanPsnr": 15.940247200243334,
               "minPsnr": 14.12657650596546
+            },
+            "image": {
+              "src": "motorcycle-512-i3d/baked.webp",
+              "width": 492,
+              "height": 524,
+              "effectiveWidth": 492,
+              "bytes": 332938,
+              "posterBytes": 34412
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "motorcycle-512-i3d/baked-xuastc.i3d",
             "assetBytes": 309316,
             "runtimeGzip": 175022,
@@ -608,6 +824,14 @@
             "lighting": {
               "meanPsnr": 15.940247200243334,
               "minPsnr": 14.12657650596546
+            },
+            "image": {
+              "src": "motorcycle-512-i3d/baked-xuastc.webp",
+              "width": 492,
+              "height": 524,
+              "effectiveWidth": 492,
+              "bytes": 345146,
+              "posterBytes": 34498
             }
           },
           {
@@ -645,11 +869,19 @@
             "codecPsnr": 45.15116473735504,
             "textureBytes": 23070240,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "motorcycle-1024-i3d/live.webp",
+              "width": 1004,
+              "height": 1068,
+              "effectiveWidth": 1004,
+              "bytes": 1323100,
+              "posterBytes": 78156
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "motorcycle-1024-i3d/live-xuastc.i3d",
             "assetBytes": 1244899,
             "runtimeGzip": 175022,
@@ -660,7 +892,15 @@
             "codecPsnr": 40.84607935255043,
             "textureBytes": 15382048,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "motorcycle-1024-i3d/live-xuastc.webp",
+              "width": 1004,
+              "height": 1068,
+              "effectiveWidth": 1004,
+              "bytes": 1324706,
+              "posterBytes": 78352
+            }
           },
           {
             "id": "baked",
@@ -677,11 +917,19 @@
             "lighting": {
               "meanPsnr": 16.23509016498605,
               "minPsnr": 14.27661335937316
+            },
+            "image": {
+              "src": "motorcycle-1024-i3d/baked.webp",
+              "width": 1004,
+              "height": 1068,
+              "effectiveWidth": 1004,
+              "bytes": 919410,
+              "posterBytes": 101996
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "motorcycle-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 1016114,
             "runtimeGzip": 175022,
@@ -695,6 +943,14 @@
             "lighting": {
               "meanPsnr": 16.23509016498605,
               "minPsnr": 14.27661335937316
+            },
+            "image": {
+              "src": "motorcycle-1024-i3d/baked-xuastc.webp",
+              "width": 1004,
+              "height": 1068,
+              "effectiveWidth": 1004,
+              "bytes": 1119456,
+              "posterBytes": 101896
             }
           },
           {
@@ -738,11 +994,19 @@
             "codecPsnr": 44.409154316080304,
             "textureBytes": 4720384,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "boat-512-i3d/live.webp",
+              "width": 500,
+              "height": 636,
+              "effectiveWidth": 500,
+              "bytes": 403632,
+              "posterBytes": 20796
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "boat-512-i3d/live-xuastc.i3d",
             "assetBytes": 369216,
             "runtimeGzip": 175022,
@@ -753,7 +1017,15 @@
             "codecPsnr": 41.19792284150475,
             "textureBytes": 3790144,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "boat-512-i3d/live-xuastc.webp",
+              "width": 500,
+              "height": 636,
+              "effectiveWidth": 500,
+              "bytes": 390760,
+              "posterBytes": 20606
+            }
           },
           {
             "id": "baked",
@@ -770,11 +1042,19 @@
             "lighting": {
               "meanPsnr": 20.344349210734325,
               "minPsnr": 16.154839503448674
+            },
+            "image": {
+              "src": "boat-512-i3d/baked.webp",
+              "width": 500,
+              "height": 636,
+              "effectiveWidth": 500,
+              "bytes": 200790,
+              "posterBytes": 18846
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "boat-512-i3d/baked-xuastc.i3d",
             "assetBytes": 236537,
             "runtimeGzip": 175022,
@@ -788,6 +1068,14 @@
             "lighting": {
               "meanPsnr": 20.344349210734325,
               "minPsnr": 16.154839503448674
+            },
+            "image": {
+              "src": "boat-512-i3d/baked-xuastc.webp",
+              "width": 500,
+              "height": 636,
+              "effectiveWidth": 500,
+              "bytes": 256468,
+              "posterBytes": 19012
             }
           },
           {
@@ -825,11 +1113,19 @@
             "codecPsnr": 41.2516699902908,
             "textureBytes": 18876160,
             "textureFormat": "rgba",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "boat-1024-i3d/live.webp",
+              "width": 1024,
+              "height": 1300,
+              "effectiveWidth": 1024,
+              "bytes": 945120,
+              "posterBytes": 56792
+            }
           },
           {
             "id": "pbr-xuastc",
-            "name": "Live light \u2013 XUASTC",
+            "name": "Live light – XUASTC",
             "src": "boat-1024-i3d/live-xuastc.i3d",
             "assetBytes": 958008,
             "runtimeGzip": 175022,
@@ -840,7 +1136,15 @@
             "codecPsnr": 40.343633645507,
             "textureBytes": 15149712,
             "textureFormat": "astc",
-            "lighting": null
+            "lighting": null,
+            "image": {
+              "src": "boat-1024-i3d/live-xuastc.webp",
+              "width": 1024,
+              "height": 1300,
+              "effectiveWidth": 1024,
+              "bytes": 1016174,
+              "posterBytes": 57214
+            }
           },
           {
             "id": "baked",
@@ -857,11 +1161,19 @@
             "lighting": {
               "meanPsnr": 21.780401655483274,
               "minPsnr": 17.645947236030455
+            },
+            "image": {
+              "src": "boat-1024-i3d/baked.webp",
+              "width": 1024,
+              "height": 1300,
+              "effectiveWidth": 1024,
+              "bytes": 615894,
+              "posterBytes": 55942
             }
           },
           {
             "id": "baked-xuastc",
-            "name": "Baked studio \u2013 XUASTC",
+            "name": "Baked studio – XUASTC",
             "src": "boat-1024-i3d/baked-xuastc.i3d",
             "assetBytes": 746068,
             "runtimeGzip": 175022,
@@ -875,6 +1187,14 @@
             "lighting": {
               "meanPsnr": 21.780401655483274,
               "minPsnr": 17.645947236030455
+            },
+            "image": {
+              "src": "boat-1024-i3d/baked-xuastc.webp",
+              "width": 1024,
+              "height": 1300,
+              "effectiveWidth": 1024,
+              "bytes": 803314,
+              "posterBytes": 56292
             }
           },
           {

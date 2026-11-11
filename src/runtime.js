@@ -1,3 +1,8 @@
+import {cameraPose,createCameraMotion} from './camera-motion.js';
+import {enhanceImage,installNativeImages} from './native-image.js';
+export {enhanceImage};
+import {captureBytes} from './container.js';
+import {chooseSource,contentSize,frameLayout} from './responsive.js';
 import {normalizeLighting,enhanced,lightingState,studioUniforms,studioShader} from './lighting.js';
 import {surfaceCrossingGlsl} from './surface-shader.js';
 import {antialiasShader} from './antialias.js';
@@ -7,6 +12,7 @@ precision highp float;
 uniform sampler2D boxes;
 uniform vec3 eye, right, up, forward;
 uniform float aspect, focal;
+uniform vec4 frameTransform;
 uniform int offset;
 flat out int id;
 out vec3 world;
@@ -29,7 +35,7 @@ void main(){
  world=box(0).xyz+basis*((n+r*q.x+u*q.y)*box(1).xyz);
  vec3 p=world-eye;
  float z=dot(p,forward), near=.01,far=100.;
- gl_Position=vec4(dot(p,right)*focal/aspect,dot(p,up)*focal,(far+near)/(far-near)*z-2.*far*near/(far-near),z);
+ gl_Position=vec4(vec2(dot(p,right)*focal/aspect,dot(p,up)*focal)*frameTransform.xy+frameTransform.zw*z,(far+near)/(far-near)*z-2.*far*near/(far-near),z);
 }`;
 const fragment = `#version 300 es
 precision highp float;
@@ -267,13 +273,14 @@ import {createGpu} from './webgpu.js';
 const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
 /** Optional trusted XUASTC entry; capture files never supply executable code. */
 export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
+const cameraMotion=createCameraMotion(el=>enqueue(el));
 const elements=new Set(),pending=new Map(),cpu=new Map(),gpu=new Map(),uploads=new Map(),programs=new Map(),lastRendered=new WeakMap();
 const limits={entries:8,cpuBytes:32*1024*1024,gpuBytes:64*1024*1024};
 let surface,gl,depthBits,resolveTexture,canCache=false,epoch=0,running=false,renders=0,contexts=0,decodes=0,surfaceBuilds=0,surfaceReuses=0,viewRenders=0;
 const bytes=cache=>[...cache.values()].reduce((sum,r)=>sum+(r.bytes||0),0);
 const touch=(cache,key,value)=>{cache.delete(key);cache.set(key,value);return value;};
 const dispose=r=>{if(r.api)r.api.destroy(r);else for(const t of r.textures)gl?.deleteTexture(t);};
-const activeUrls=()=>new Set([...elements].filter(el=>el.visible&&el.url&&!el.abort?.signal.aborted).map(el=>el.url));
+const activeUrls=()=>new Set([...elements].filter(el=>el.visible&&(el.url||el.loadingUrl)&&!el.abort?.signal.aborted).flatMap(el=>[el.url,el.loadingUrl].filter(Boolean)));
 const inactive=(cache,active)=>new Map([...cache].filter(([url,r])=>!active.has(url)&&!r.waiters?.size));
 function trim(cache,budget,active=activeUrls()){
  const idle=inactive(cache,active);let count=idle.size,total=bytes(idle);
@@ -325,6 +332,7 @@ function clearCaches(){
 }
 function validate(data,max){
  if(![1,2].includes(data.version)||!data.pages?.length||!data.batches?.length)throw Error('Unsupported img-3d version');
+ if(data.display&&(![1,2].includes(data.display.version)||!['width','height','effectiveWidth'].every(k=>Number.isInteger(data.display[k])&&data.display[k]>0&&data.display[k]<=16384)||data.display.version===2&&(!numbers(data.display.frame,4)||data.display.frame[2]<=0||data.display.frame[3]<=0||!Array.isArray(data.display.support)||data.display.support.length<3||data.display.support.length>294||data.display.support.length%3!==0||!data.display.support.every(Number.isFinite)||Math.abs(data.display.frame[2]/data.display.frame[3]-data.display.width/data.display.height)>.001)))throw Error('Invalid display metadata');
  const roles=data.appearance==='baked'?2:3;
  if((data.version===1&&data.appearance!==undefined)||(data.version===2&&data.appearance!=='baked'))throw Error('Unsupported img-3d appearance');
  if(!Array.isArray(data.images)||data.images.length!==data.pages.length*roles||new Set(data.pages.flatMap(p=>p.images)).size!==data.images.length)throw Error('Invalid img-3d images');
@@ -354,7 +362,7 @@ async function source(url,signal){
    const release=await fetchSlot(abort.signal);
    try{
     const response=await fetch(url,{signal:abort.signal});if(!response.ok)throw Error(`HTTP ${response.status}`);
-    const bytes=new Uint8Array(await response.arrayBuffer());
+    const bytes=captureBytes(new Uint8Array(await response.arrayBuffer()));
     if(String.fromCharCode(...bytes.subarray(0,4))!=='I3D1')throw Error('Unsupported img-3d file');
     const raw=new Uint8Array(await new Response(new Blob([bytes.subarray(4)]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
     abort.signal.throwIfAborted();
@@ -458,7 +466,7 @@ function program(key){if(programs.has(key))return programs.get(key);
   gl.attachShader(p,shader);gl.deleteShader(shader);
  }
  gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS)){const message=gl.getProgramInfoLog(p);gl.deleteProgram(p);throw Error(message);}
- const locations={};for(const name of ['eye','right','up','forward','aspect','focal','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','studioMap','studioLights','environmentParams','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin','image','area'])locations[name]=gl.getUniformLocation(p,name);
+ const locations={};for(const name of ['eye','right','up','forward','aspect','focal','frameTransform','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','studioMap','studioLights','environmentParams','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin','image','area'])locations[name]=gl.getUniformLocation(p,name);
  const result={program:p,locations};programs.set(key,result);return result;
 }
 function dropSurface(el){
@@ -468,7 +476,7 @@ function dropSurface(el){
 }
 function surfaceCache(el,asset,w,h,opaque){
  if(!canCache||asset.data.appearance==='baked'||!opaque.length)return null;
- const key=[epoch,el.yaw,el.pitch,el.distance,w,h].join(',');
+ const camera=cameraPose(el),key=[epoch,camera.yaw,camera.pitch,camera.distance,w,h,...el.layoutSignature].join(',');
  let cache=el.surfaceCache;
  if(cache&&(cache.asset!==asset||cache.w!==w||cache.h!==h)){dropSurface(el);cache=null;}
  const stable=el.surfacePose===key;el.surfacePose=key;
@@ -495,14 +503,14 @@ function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
  // Compile cache writes separately so forward PBR does not carry their branch.
  const light=el.lighting,studio=mode!=='baked'&&mode!=='cache'&&enhanced(light),key=studio?'studio'+(light.lights?.length?3:0):['baked','cache','reuse'].includes(mode)?mode:'pbr';
  const {program:p,locations:u}=program(key);
- const eye=[Math.sin(el.yaw)*Math.cos(el.pitch)*el.distance,Math.sin(el.pitch)*el.distance,Math.cos(el.yaw)*Math.cos(el.pitch)*el.distance];
+ const camera=cameraPose(el),eye=[Math.sin(camera.yaw)*Math.cos(camera.pitch)*camera.distance,Math.sin(camera.pitch)*camera.distance,Math.cos(camera.yaw)*Math.cos(camera.pitch)*camera.distance];
  const forward=unit(eye.map(x=>-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward);
  gl.useProgram(p);for(const [name,v]of Object.entries({eye,right,up,forward}))gl.uniform3fv(u[name],v);
  if(mode!=='baked'){
   const light=el.lighting;gl.uniform3fv(u.lightDirection,light.direction);gl.uniform1f(u.lightIntensity,light.intensity);gl.uniform1f(u.ambientIntensity,light.ambient);
  }
  gl.uniform1i(u.cacheInput,mode==='reuse');gl.uniform1i(u.cacheOutput,mode==='cache');gl.uniform2i(u.origin,x,y);
- gl.uniform1f(u.aspect,w/h);gl.uniform1f(u.focal,2.41421356);
+ gl.uniform1f(u.aspect,el.frameRatio);gl.uniform1f(u.focal,2.41421356);gl.uniform4f(u.frameTransform,el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy);
  const bind=(texture,slot,name)=>{gl.activeTexture(gl.TEXTURE0+slot);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(u[name],slot);};
  if(studio){const values=studioUniforms(light);gl.uniform4fv(u.studioLights,values.subarray(0,24));gl.uniform4fv(u.environmentParams,values.subarray(24));bind(studioTexture(light.environment),6,'studioMap');}
  bind(cache?.textures[0]??asset.textures[0],4,'hitMap');bind(cache?.textures[1]??asset.textures[0],5,'hitDepth');
@@ -519,7 +527,7 @@ function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
 }
 function present(el,asset,{x,y,w,h}){
  viewRenders++;
- const eye=[Math.sin(el.yaw)*Math.cos(el.pitch)*el.distance,Math.sin(el.pitch)*el.distance,Math.cos(el.yaw)*Math.cos(el.pitch)*el.distance],opaque=[],transparent=[];
+ const camera=cameraPose(el),eye=[Math.sin(camera.yaw)*Math.cos(camera.pitch)*camera.distance,Math.sin(camera.pitch)*camera.distance,Math.cos(camera.yaw)*Math.cos(camera.pitch)*camera.distance],opaque=[],transparent=[];
  for(const batch of asset.batches){if(!batch.blend)opaque.push([batch,0,batch.boxes.length]);else batch.boxes.forEach((box,i)=>transparent.push([batch,i,1,box.c.reduce((s,x,k)=>s+(x-eye[k])**2,0)]));}
  transparent.sort((a,b)=>b[3]-a[3]);
  const cache=surfaceCache(el,asset,w,h,opaque);
@@ -547,18 +555,19 @@ function resolveLive(finished){
 // Automatic updates compare rendered inputs, independent of what caused them.
 // Explicit draw() still refreshes the canvas for immediate pixel readback.
 function viewState(el,asset,w,h){
- const light=el.lighting;
- return[asset,el.generation,api??gl,epoch,el.canvas,w,h,el.yaw,el.pitch,el.distance,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
+ const light=el.lighting,camera=cameraPose(el);
+ return[asset,el.generation,api??gl,epoch,el.canvas,w,h,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
 }
 function sameView(el,state){const old=lastRendered.get(el);return old?.length===state.length&&state.every((value,i)=>Object.is(value,old[i]));}
-function dimensions(el){const ratio=Math.min(devicePixelRatio||1,2);return[Math.max(1,Math.round(el.clientWidth*ratio)),Math.max(1,Math.round(el.clientHeight*ratio))];}
+function dimensions(el){const camera=cameraPose(el),ratio=Math.min(devicePixelRatio||1,2),style=getComputedStyle(el),[w,h]=contentSize(el,style),key=[w,h,style.objectFit,style.objectPosition,el.frameRatio,el.naturalWidth,el.metadata,...(el.metadata?.frame??el.data?.display?.frame??[]),...(el.metadata?.support?[camera.yaw,camera.pitch]:[])];if(!el.layoutKey||key.some((v,i)=>v!==el.layoutKey[i])){el.layoutKey=key;el.layout=frameLayout(el,w,h,style);el.layoutSignature=[el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy,el.frameRatio];}return[Math.max(1,Math.round(w*ratio)),Math.max(1,Math.round(h*ratio))];}
 function enqueue(el,force=false){
- if(!el.isConnected||!el.visible||!el.src)return Promise.resolve(false);
+ if(!el.isConnected||!el.visible||!(el.src||el.srcset))return Promise.resolve(false);
+ const size=dimensions(el),selected=el.pickSource(true);if(selected===el.failedSource&&!el.url)return Promise.resolve(false);if(selected!==el.url&&selected!==el.failedSource){const loading=el.load();if(!el.data||!el.adaptiveLoad)return loading;}
  const generation=el.generation;
  let job=pending.get(el);
  if(job?.generation===generation){job.force||=force;return job.promise;}
  const asset=gpu.get(el.url);
- if(!force&&asset&&!asset.disposed&&sameView(el,viewState(el,asset,...dimensions(el))))return Promise.resolve(false);
+ if(!force&&asset&&!asset.disposed&&sameView(el,viewState(el,asset,...size)))return Promise.resolve(false);
  if(!job||job.generation!==generation){
   job={generation,force};job.promise=new Promise(resolve=>job.resolve=resolve);pending.set(el,job);
   resource(el.url,el.abort.signal).then(asset=>{job.asset=asset;job.ready=true;if(pending.get(el)===job)pump();},error=>{job.error=error;job.ready=true;if(pending.get(el)===job)pump();});
@@ -571,9 +580,9 @@ function layout(){
  let x=0,y=0,row=0,width=0;
  for(const [el,job]of pending){
   if(!job.ready)continue;
-  const w=Math.max(1,Math.round(el.clientWidth*ratio)),h=Math.max(1,Math.round(el.clientHeight*ratio));
+  const [w,h]=dimensions(el);
   if(!job.force&&job.asset&&!job.error&&sameView(el,viewState(el,job.asset,w,h))){pending.delete(el);job.resolve(false);continue;}
-  const key=JSON.stringify([el.url,el.yaw,el.pitch,el.distance,w,h,job.asset?.data.appearance==='baked'?null:lightingState(el.lighting)]),region=regions.get(key);
+  const camera=cameraPose(el),key=JSON.stringify([el.url,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,w,h,job.asset?.data.appearance==='baked'?null:lightingState(el.lighting)]),region=regions.get(key);
   if(region){views.push({el,job,key,...region});continue;}
   if(x&&x+w>Math.max(limit,w)){x=0;y+=row;row=0;}
   if(views.length&&y+h>limit)break;
@@ -610,7 +619,7 @@ async function pumpGpu(){
   for(const [el,job,state]of finished){
    lastRendered.set(el,state);
    el.data=job.asset.data;el.status.textContent='';renders++;
-   if(el.loadedGeneration!==el.generation){el.loadedGeneration=el.generation;el.dispatchEvent(new Event('load'));}
+   if(el.loadedGeneration!==el.generation&&!el.adaptiveLoad){el.loadedGeneration=el.generation;el.dispatchEvent(new Event('load'));}
    job.resolve(true);
   }
  }
@@ -645,21 +654,21 @@ async function pump(){
    try{
    if(el.isConnected&&el.visible&&job.generation===el.generation&&!document.hidden&&renderEpoch===epoch&&!gl.isContextLost()){
     copy(el,view);lastRendered.set(el,viewState(el,asset,view.w,view.h));el.data=asset.data;el.status.textContent='';success=true;
-    if(el.loadedGeneration!==el.generation){el.loadedGeneration=el.generation;el.dispatchEvent(new Event('load'));}
+    if(el.loadedGeneration!==el.generation&&!el.adaptiveLoad){el.loadedGeneration=el.generation;el.dispatchEvent(new Event('load'));}
    }else if(document.hidden||renderEpoch!==epoch)enqueue(el);
    }catch(error){if(job.generation===el.generation&&!el.abort.signal.aborted)el.fail(error);}
    job.resolve(success);
   }
  }}finally{running=false;if(pending.size&&!document.hidden)pump();}
 }
-const intersection=new IntersectionObserver(entries=>{for(const {target:el,isIntersecting}of entries){el.visible=isIntersecting;if(isIntersecting)el.load();else{el.abort?.abort();cancel(el);dropSurface(el);}}trimCaches();},{rootMargin:'128px'});
-const resize=new ResizeObserver(entries=>{for(const {target}of entries)enqueue(target);});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){for(const el of elements)enqueue(el);pump();}});
+const intersection=new IntersectionObserver(entries=>{for(const {target:el,isIntersecting}of entries){el.visible=isIntersecting;if(isIntersecting)el.load();else{cameraMotion.stop(el);el.abort?.abort();cancel(el);dropSurface(el);}}trimCaches();},{rootMargin:'128px'});
+const resize=new ResizeObserver(entries=>{for(const {target}of entries)target.load();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const el of elements)cameraMotion.stop(el);}else{for(const el of elements)enqueue(el);pump();}});
 addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
 
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {
- static observedAttributes=['src'];
+ static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class'];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
   return {backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length,attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
@@ -674,23 +683,44 @@ export class Img3d extends HTMLElement {
  }
  get src(){return this.getAttribute('src')??'';}
  set src(value){this.setAttribute('src',value);}
+ get srcset(){return this.getAttribute('srcset')??'';}
+ set srcset(value){if(this.srcset!==value)this.setAttribute('srcset',value);}
+ get currentSrc(){return this.url??'';}
+ get naturalWidth(){return this.metadata?.width??this.data?.display?.width??(this.data?300:0);}
+ get naturalHeight(){return this.metadata?.height??this.data?.display?.height??(this.data?300:0);}
+ get width(){return this.clientWidth;}
+ set width(value){if(this.getAttribute('width')!==String(value))this.setAttribute('width',String(value));}
+ get height(){return this.clientHeight;}
+ set height(value){if(this.getAttribute('height')!==String(value))this.setAttribute('height',String(value));}
+ get alt(){return this.getAttribute('alt')??'';}
+ set alt(value){if(this.alt!==value)this.setAttribute('alt',value);}
+ get frameRatio(){const w=Number(this.getAttribute('width')),h=Number(this.getAttribute('height'));return this.metadata||this.data?this.naturalWidth/this.naturalHeight:w>0&&h>0?w/h:1;}
+ syncSizing(){
+  for(const name of ['width','height']){const n=Number(this.getAttribute(name)),value=n>0?n+'px':'';if(this.style.getPropertyValue('--img3d-'+name)!==value){if(value)this.style.setProperty('--img3d-'+name,value);else this.style.removeProperty('--img3d-'+name);}}
+  const ratio=String(this.frameRatio);if(this.style.getPropertyValue('--img3d-ratio')!==ratio)this.style.setProperty('--img3d-ratio',ratio);
+  const alt=this.alt||this.getAttribute('aria-label');this.canvas.setAttribute('aria-label',(alt?alt+'. ':'3D model. ')+'Drag or arrow keys rotate; plus and minus zoom; Home resets.');
+ }
+ pickSource(ready=false){if(!this.srcset)return this.src?new URL(this.src,this.baseURI).href:'';if(!ready)dimensions(this);const selected=chooseSource(this.srcset,this.src,this.layout.width*4/cameraPose(this).distance,Math.min(devicePixelRatio||1,2),this.url,this.baseURI);return selected?new URL(selected,this.baseURI).href:'';}
+
  constructor(){
   super();this.generation=0;this.visible=false;
-  this.attachShadow({mode:'open'}).innerHTML='<style>:host{display:inline-block;position:relative;width:300px;height:300px}canvas{width:100%;height:100%;display:block;touch-action:pan-y pinch-zoom}span{position:absolute;padding:1em;pointer-events:none}</style><span role="status"></span><canvas tabindex="0" aria-label="3D model. Drag or arrow keys rotate; plus and minus zoom; Home resets."></canvas>';
+  this.attachShadow({mode:'open'}).innerHTML='<style>:host{display:inline-block;position:relative;width:var(--img3d-width,300px);height:var(--img3d-height,auto);aspect-ratio:var(--img3d-ratio,1);object-fit:contain}canvas{position:absolute;inset:0;box-sizing:border-box;padding:inherit;width:100%;height:100%;display:block;outline:none;touch-action:pan-y pinch-zoom}span{position:absolute;padding:1em;pointer-events:none}</style><span role="status"></span><canvas tabindex="0" aria-label="3D model. Drag or arrow keys rotate; plus and minus zoom; Home resets."></canvas>';
   this.canvas=this.shadowRoot.querySelector('canvas');this.status=this.shadowRoot.querySelector('span');this.reset();
-  this.canvas.onpointerdown=e=>{if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
-  this.canvas.onpointermove=e=>{if(!this.pointer)return;if(this.pointer[2]==='touch'&&Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;this.yaw-=(e.clientX-this.pointer[0])*.01;this.pitch=Math.max(-1.5,Math.min(1.5,this.pitch+(e.clientY-this.pointer[1])*.01));this.pointer=[e.clientX,e.clientY,e.pointerType];enqueue(this);};
+  this.canvas.onpointerdown=e=>{if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}const pose=cameraPose(this);Object.assign(this,{yaw:pose.yaw,pitch:pose.pitch,distance:pose.distance});cameraMotion.stop(this);this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
+  this.canvas.onpointermove=e=>{if(!this.pointer)return;if(this.pointer[2]==='touch'&&Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;cameraMotion.hold(this);this.yaw-=(e.clientX-this.pointer[0])*.01;this.pitch=Math.max(-1.5,Math.min(1.5,this.pitch+(e.clientY-this.pointer[1])*.01));this.pointer=[e.clientX,e.clientY,e.pointerType];cameraMotion.to(this);};
   this.canvas.onpointerup=this.canvas.onpointercancel=()=>{this.pointer=null;};
   this.canvas.onwheel=e=>{if(!e.altKey)return;e.preventDefault();this.distance=Math.max(1.8,Math.min(15,this.distance*Math.exp(e.deltaY*.001)));enqueue(this);};
   this.canvas.ondblclick=()=>this.reset();
   this.canvas.onkeydown=e=>{
+   if(!['Home','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-'].includes(e.key))return;
+   cameraMotion.stop(this);
    if(e.key==='Home')this.reset();else if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;
    else if(e.key==='ArrowUp')this.pitch=Math.min(1.5,this.pitch+.1);else if(e.key==='ArrowDown')this.pitch=Math.max(-1.5,this.pitch-.1);
    else if(e.key==='+'||e.key==='=')this.distance=Math.max(1.8,this.distance*.9);else if(e.key==='-')this.distance=Math.min(15,this.distance/.9);else return;
    e.preventDefault();enqueue(this);
   };
  }
- reset(){this.yaw=.55;this.pitch=.2;this.distance=4;enqueue(this);}
+ reset(){cameraMotion.stop(this);this.yaw=.55;this.pitch=.2;this.distance=4;enqueue(this);}
  // A canvas bound to a lost WebGPU device cannot take a 2D context; a fresh one
  // with the same handlers serves the WebGL fallback.
  replaceCanvas(){
@@ -698,21 +728,37 @@ export class Img3d extends HTMLElement {
   for(const name of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onwheel','ondblclick','onkeydown'])next[name]=old[name];
   old.replaceWith(next);this.canvas=next;this.gpuContext=this.gpuDevice=null;
  }
- connectedCallback(){elements.add(this);resize.observe(this);intersection.observe(this);this.load();}
+ connectedCallback(){elements.add(this);this.syncSizing();resize.observe(this);intersection.observe(this);this.load();}
  disconnectedCallback(){elements.delete(this);resize.unobserve(this);intersection.unobserve(this);this.visible=false;this.release();if(!elements.size)clearCaches();}
- attributeChangedCallback(){this.release();if(this.isConnected)this.load();}
- release(){this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
+ attributeChangedCallback(name){if(!this.isConnected)return;if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
+ release(){cameraMotion.stop(this);this.loadingUrl=null;this.metadata=null;this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
  async load(){
-  if(!this.isConnected||!this.visible)return;
-  const url=this.src?new URL(this.src,this.baseURI).href:null;
-  if(!url){this.release();this.url=null;this.status.textContent='';return;}
-  if(this.url!==url){this.release();this.url=url;}
-  if(!this.abort||this.abort.signal.aborted)this.abort=new AbortController();
-  const generation=this.generation;this.status.textContent=this.data?'':'Loading…';
-  try{await resource(url,this.abort.signal);if(generation===this.generation)await enqueue(this);}
-  catch(error){if(generation===this.generation&&!this.abort.signal.aborted&&error?.name!=='AbortError')this.fail(error);}
+  if(!this.isConnected||!this.visible)return false;
+  const url=this.pickSource();
+  if(url===this.failedSource)return false;
+  if(!url){this.release();this.url=null;return false;}
+  if(this.loadingUrl===url)return this.loadTask;
+  if(this.url===url&&gpu.has(url)&&!gpu.get(url).disposed&&!this.abort?.signal.aborted&&!this.reloadSource)return enqueue(this);
+  const adaptive=!!this.data&&!this.reloadSource&&this.url!==url;this.adaptiveLoad=adaptive;this.reloadSource=false;
+  this.generation++;this.abort?.abort();cancel(this);this.abort=new AbortController();
+  let generation=this.generation;this.loadingUrl=url;this.status.textContent=this.data?'':'Loading…';
+  return this.loadTask=(async()=>{
+   try{
+    const asset=await resource(url,this.abort.signal);if(generation!==this.generation)return false;
+    if(adaptive&&this.pickSource()!==url)return enqueue(this);
+    cancel(this);generation=++this.generation;this.adaptiveLoad=false;dropSurface(this);this.metadata=asset.data.display??{width:300,height:300};this.url=url;
+    const initial=!this.poseStarted;this.poseStarted=true;
+    if(initial&&!this.skipIntro)cameraMotion.hold(this,{yaw:.55,pitch:.2,distance:4,...asset.data.display?.camera});
+    this.syncSizing();const shown=await enqueue(this);
+    if(initial&&shown&&!this.skipIntro)cameraMotion.to(this,300);
+    return shown;
+   }catch(error){if(generation===this.generation&&!this.abort.signal.aborted&&error?.name!=='AbortError'){this.failedSource=url;if(adaptive){this.status.textContent='';this.dispatchEvent(new CustomEvent('error',{detail:error}));}else{this.url=null;this.metadata=null;dropSurface(this);this.fail(error);}}return false;}
+   finally{if(generation===this.generation){this.loadingUrl=null;this.adaptiveLoad=false;trimCaches();}}
+  })();
  }
- fail(error){this.data=null;blank(this);this.status.textContent=error.message;this.dispatchEvent(new CustomEvent('error',{detail:error}));}
- draw(){return enqueue(this,true);}
+ fail(error){cameraMotion.stop(this);this.data=null;this.loadedGeneration=-1;blank(this);const asset=gpu.get(this.url);if(asset)lastRendered.set(this,viewState(this,asset,...dimensions(this)));this.status.textContent=error.message;this.dispatchEvent(new CustomEvent('error',{detail:error}));}
+ draw(){this.skipIntro=true;cameraMotion.stop(this);return this.loadingUrl&&!this.adaptiveLoad?this.loadTask:enqueue(this,true);}
 }
 if(customElements.get('img-3d'))Img3d=customElements.get('img-3d');else customElements.define('img-3d',Img3d);
+
+installNativeImages();

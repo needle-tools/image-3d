@@ -51,7 +51,7 @@ test('one comparison page switches models, resolutions, appearance, references a
    await page.getByLabel('Model',{exact:true}).selectOption(model.id);
    await page.getByLabel('Resolution',{exact:true}).selectOption(String(resolution.size));
    await page.getByLabel('Appearance',{exact:true}).selectOption(variant.id);
-   await page.waitForFunction(({src,size,webp})=>{const el=document.querySelector(webp?'#turntable':'#viewer');return el.data&&el.src===src&&(webp?el.data.size===size&&Number.isInteger(el.frame)&&el.image.naturalWidth===size&&el.image.src.includes(src.replace('model.json','view-')):el.data.pages[0].size===size);},{src:variant.src,size:resolution.size,webp:variant.id==='webp'});
+   await page.waitForFunction(({src,size,webp})=>{const el=document.querySelector(webp?'#turntable':'#viewer');return el.data&&el.src===src&&(webp?el.data.size===size&&Number.isInteger(el.frame)&&el.image.naturalWidth===size&&el.image.src.includes(src.replace('model.json','view-')):el.data.pages[0].size===size);},{src:variant.image?.src??variant.src,size:resolution.size,webp:variant.id==='webp'});
    if(variant.id==='webp'){
     assert.equal(await page.getByLabel('Reference',{exact:true}).isVisible(),false);
     assert.equal(await page.locator('#referenceFigure').isVisible(),false,'Source turntable showed a missing reference image');
@@ -80,7 +80,7 @@ test('one comparison page switches models, resolutions, appearance, references a
    assert.equal(await page.getByLabel('Model',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Item size',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Follow mouse',{exact:true}).isEnabled(),true);
    const actual=await page.locator('#grid '+tag).evaluateAll(tiles=>tiles.map(el=>({model:el.dataset.model,src:el.src})));
    const size=Number(await page.getByLabel('Resolution',{exact:true}).inputValue()),mode=await page.getByLabel('Appearance',{exact:true}).inputValue();
-   assert.deepEqual(actual,Array.from({length:120},(_,i)=>{const m=catalog[i%catalog.length];return{model:m.id,src:m.resolutions.find(r=>r.size===size).variants.find(v=>v.id===mode).src};}));
+   assert.deepEqual(actual,Array.from({length:120},(_,i)=>{const m=catalog[i%catalog.length];const v=m.resolutions.find(r=>r.size===size).variants.find(v=>v.id===mode);return{model:m.id,src:v.image?.src??v.src};}));
   };
   const follows=async(point,away=false,except=null)=>page.waitForFunction(({point,away,except})=>[...document.querySelectorAll('#grid img-3d,#grid img-turntable')].every(el=>{
    if(el.dataset.instance===except)return true;const r=el.getBoundingClientRect();if(r.bottom<=0||r.top>=innerHeight)return true;
@@ -143,7 +143,7 @@ test('one comparison page switches models, resolutions, appearance, references a
   assert(Number.isInteger(pointerId));await cancelTarget.locator('canvas').dispatchEvent('pointercancel',{pointerId,pointerType:'mouse',clientX:cancelBox.x+60,clientY:cancelBox.y+70});assert.equal(await page.locator('#grid [data-dragging]').count(),0);await page.mouse.up();
   // The five 1024 live captures exceed the default cache: hovering must not
   // re-upload the same models on every move.
-  await page.getByLabel('Appearance',{exact:true}).selectOption('pbr');await checkGridSources('img-3d');await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.data&&el.textureBytes>0;}));
+  await page.getByLabel('Appearance',{exact:true}).selectOption('pbr');await checkGridSources('img-3d');await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.currentSrc===new URL(el.src,el.baseURI).href&&el.data?.appearance!=='baked'&&el.textureBytes>0;}));
   await page.getByLabel('Move light',{exact:true}).check();await page.waitForFunction(()=>[...document.querySelectorAll('#grid img-3d')].every(el=>{const r=el.getBoundingClientRect();return r.top>=innerHeight||r.bottom<=0||el.lighting.lights?.length===3;}));await page.getByLabel('Move light',{exact:true}).uncheck();assert(await page.locator('#grid img-3d').evaluateAll(tiles=>tiles.every(el=>el.lighting.lights?.length===0&&el.lighting.environmentIntensity===1)));
   const uploads=await page.evaluate(()=>customElements.get('img-3d').statistics.decodes);
   for(const point of [[350,210],[650,230]]){await page.mouse.move(...point);await follows(point);await page.evaluate(()=>Promise.all([...document.querySelectorAll('#grid img-3d')].map(el=>el.draw())));}

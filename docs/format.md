@@ -1,6 +1,6 @@
 # Image 3D format and runtime
 
-A browser-only custom element: one JavaScript file and one `.i3d` capture. It
+A browser-only renderer: one JavaScript file and one `.i3d` capture or WebP package. It
 renders with WebGPU when the browser provides it and with WebGL 2 otherwise. The
 core uses native image decoding and renders only when a view changes.
 
@@ -19,6 +19,41 @@ loading. The final disconnect releases caches and the optional decoder worker.
 and prepare path include them. HTTPS or localhost is required for native
 DecompressionStream; generated self-contained HTML also works from disk in the
 tested Chrome. The [project README](../README.md) documents conversion, qualification and the comparison page.
+
+## Responsive layout and sources
+
+`srcset` accepts width (`w`) or density (`x`) candidates. Width descriptors are
+the converter's `display.effectiveWidth`, measured at distance 4 and a 45° field
+of view, rather than capture-atlas dimensions. Selection uses the laid-out image
+frame size, device pixel ratio (capped at 2) and camera zoom. The component measures
+its actual slot, so it needs no `sizes` string. Upgrades have boundary hysteresis;
+shrinking or zooming out retains a loaded higher-resolution candidate in the set.
+The current view remains interactive until a replacement is ready. Source changes
+are shared through the normal caches. `currentSrc` reports the capture on display.
+
+`width` and `height` attributes provide default dimensions and an aspect ratio;
+CSS can override them. `naturalWidth` and `naturalHeight` report display metadata
+after loading (300×300 for older captures, zero before loading). The default fit is
+`contain`; `fill`, `cover`, `none`, `scale-down` and `object-position` are also
+interpreted by both renderers. Normal CSS scrolling, clipping and stacking remain
+owned by the element's canvas. For layout before component registration, include
+critical sizing CSS or use a native poster; custom elements do not acquire native
+image layout merely by having width/height attributes.
+
+An `<img>` or `<picture>` with `data-img-3d` is progressively enhanced when its
+selected image is a WebP package. Native `srcset`, `sizes`, `<source media/type>`,
+dimensions and alt text remain on the image. The overlay follows the browser's
+`currentSrc` exactly; it does not select candidates or switch files on 3D zoom.
+The image stays in flow, becomes visually hidden after the
+first rendered frame, and returns on error, print or `disconnect()`. All overlays
+share the same device and cache owner as ordinary `<img-3d>` elements.
+
+`enhanceImage(connectedImageOrPicture)` returns `{image, element, disconnect}`.
+It can be called repeatedly without creating another renderer. `element` exposes
+the usual camera, lighting and draw API. Picture markup is recommended for explicit
+layout; a standalone image gets an owned wrapper that is removed on disconnect.
+Cross-origin packages need fetch CORS permission for the embedded capture, even
+when the browser can display the poster without it.
 
 ## Runtime boundary
 
@@ -122,6 +157,8 @@ memory proportional to element size and pixel density, like decoded images.
 `Img3d.statistics` reports shared counts and payload bytes. Instance getters
 `textureBytes`, `textureFormat` and `transcodeMilliseconds` describe the current
 resident capture; payload bytes exclude driver and raster-canvas overhead.
+Native poster decoding and browser image-cache memory are additional to those
+3D texture payloads and are managed by the browser.
 
 The optional studio lighting object uses:
 
@@ -231,6 +268,28 @@ code or decoder URLs.
 The JSON object has `version`, `pages`, `batches` and `images`. Version 2 also
 requires `appearance: "baked"`; version 1 omits `appearance`.
 
+- Optional `display`: versions 1 and 2 have positive integer `width`, `height` and
+  `effectiveWidth` (at most 16384). Version 1 retains its original camera frame.
+  Version 2 adds `frame: [x, y, width, height]`, a crop in normalized coordinates
+  of the canonical square camera image, with a matching pixel aspect ratio.
+  Its `support` is a flat array of up to 98 XYZ surface support points, selected
+  along uniformly distributed directions. These let orbit fitting widen the
+  frame with a small safety margin when another view would clip the surface.
+  The converter frames the reference camera with a 3% margin per side;
+  it measures the captured supported surface, rather than empty box corners.
+  `density.method` is `visible-reconstruction-footprint-v2`: captured supported texels are
+  projected into a 96×96 depth buffer for twelve orbit views. Near-depth samples
+  combine the best available capture density, so overlapping hidden surfaces or
+  duplicate boxes do not count as additional useful pixels. The recommendation
+  preserves the finest view's 99th-percentile visible detail, with two raster
+  samples per capture texel to retain reconstructed contours and filtering.
+  Widths are scaled to the content frame and rounded down to four pixels.
+  The older `visible-texel-footprint-v1` used a coarse-region lower bound; WebP
+  packaging remeasures those captures rather than using that bound as a poster size.
+  `density` also records sample count and per-view measurements. This measures
+  spatial sampling, not perceptual error; codec and rendered-quality gates remain
+  separate. `camera` records the reference orbit and field of view.
+
 - `images`: ordered `{bytes, mime}` records. `bytes` is the exact encoded payload
   length. Payloads follow the JSON in this same order, without separators.
   MIME types are `image/png`, `image/jpeg`, `image/webp`, `image/avif` or
@@ -253,6 +312,39 @@ requires `appearance: "baked"`; version 1 omits `appearance`.
 Centers and axes share one scene coordinate system. The converter centers the
 whole object at zero and scales its largest extent to two units. The default
 camera looks at the origin from distance four with a 45° vertical field of view.
+
+### WebP image package
+
+An extended WebP contains a regular poster followed by one private `I3D1` RIFF
+chunk. Its payload is a complete ordinary `.i3d` container, including its magic
+and compressed metadata and maps. The RIFF size includes the chunk and its even
+padding. The poster dimensions equal `display.width`/`height`, so native `w`
+descriptors describe actual image dimensions as required by HTML. Existing
+texture codecs and capture versions remain unchanged. If a producer's standard
+glTF `asset.thumbnail` is available during conversion and has enough pixels, it
+supplies the poster. A smaller thumbnail is retained as source data while the
+poster is rendered from the capture.
+The full source thumbnail is retained separately by the converter. The poster is
+trimmed, fitted and resized to the measured capture frame, with its actual width
+equal to `display.effectiveWidth`. Native width descriptors therefore reflect both
+the image dimensions and the capture's measured reconstruction sampling. Posters
+use a single quality-85 WebP encoding with lossless alpha. The validation suite
+compares the native poster with an equally compressed live view at 2× display
+density, keeping raster fitting error separate from reported codec error.
+Thumbnail pose and lighting are authored by the producer; arbitrary glTF thumbnails
+do not promise a matching 3D reference view.
+
+Ordinary WebP readers ignore the private chunk. Supporting renderers extract it
+and use their normal loading path. Malformed lengths, duplicate capture chunks
+or missing payloads fail clearly; native enhancement restores the poster. The
+runtime waits for native image loading before fetching the capture, allowing a
+cacheable response to be reused without transferring the complete file twice.
+This is a second fetch call to the same URL, not a shared response buffer;
+cache headers determine whether it causes revalidation or another transfer.
+The image chunks precede the capture, allowing native poster paint while the
+capture is still downloading. A Chrome screenshot regression verifies this with
+the trailing capture withheld. Other browsers have not been qualified for early
+paint. Measure poster LCP and first interactive 3D frame separately.
 
 ### Face and depth conventions
 

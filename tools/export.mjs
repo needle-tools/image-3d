@@ -9,6 +9,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { Matrix4, Vector3, Box3 } from 'three';
 import { BoxImpostor, NeedleBoxImpostorExtension } from './gltf/box-impostor-extension.js';
 import { readFixture } from './input.mjs';
+import {measureDensity} from './density.mjs';
 
 export const MAGIC = Buffer.from('I3D1');
 /** @typedef {'png'|'jpeg'|'webp'|'avif'} Codec */
@@ -30,7 +31,12 @@ const vector = a => a.map(round);
  * are deliberately not used to guess where geometry or material data live.
  * @param {Uint8Array} input */
 export async function readBoxSource(input) {
-  const doc = await new NodeIO().registerExtensions([...ALL_EXTENSIONS, NeedleBoxImpostorExtension]).readBinary(input);
+  const io=new NodeIO().registerExtensions([...ALL_EXTENSIONS,NeedleBoxImpostorExtension]),json=await io.binaryToJSON(input),thumbnailIndex=Reflect.get(json.json.asset,'thumbnail');
+  if(json.json.asset.version==='2.1'&&json.json.asset.minVersion==='2.0')json.json.asset.version='2.0';
+  const doc=await io.readJSON(json);
+  const thumbnailTexture=thumbnailIndex===undefined?null:doc.getRoot().listTextures()[thumbnailIndex];
+  if(thumbnailIndex!==undefined&&(!Number.isInteger(thumbnailIndex)||thumbnailIndex<0||!thumbnailTexture?.getImage()))throw Error('Invalid glTF asset.thumbnail image index.');
+  const thumbnail=thumbnailTexture?{bytes:Buffer.from(thumbnailTexture.getImage()),mime:thumbnailTexture.getMimeType()}:null;
   if (doc.getRoot().listAnimations().length) throw Error('img-3d is a static experiment. Export a frozen pose before converting animated assets.');
   const scene = doc.getRoot().getDefaultScene() ?? doc.getRoot().listScenes()[0];
   if (!scene) throw Error('No source scene.');
@@ -89,7 +95,7 @@ export async function readBoxSource(input) {
     }));
     return {size:page.size,maps};
   }));
-  return { pages, batches, conversions:[...conversions],normalization:{center:center.toArray(),scale} };
+  return { pages, batches, thumbnail, conversions:[...conversions],normalization:{center:center.toArray(),scale} };
 }
 
 /** @param {Page} page */
@@ -172,7 +178,7 @@ export function encodeContainer(metadata, images) {
   return Buffer.concat([MAGIC, gzipSync(Buffer.concat([size,json,...images.map(i => i.bytes)]), { level:9 })]);
 }
 
-/** @param {Uint8Array} input @param {string} output @param {{baked?:boolean}} [options] */
+/** @param {Uint8Array} input @param {string} output @param {{baked?:boolean,webp?:boolean}} [options] */
 export async function exportImg3d(input, output, options={}) {
   await mkdir(output,{recursive:true});
   const source = await readBoxSource(input), packed = source.pages.map(packPage), baked=options.baked===true,roleCount=baked?2:3;
@@ -181,6 +187,8 @@ export async function exportImg3d(input, output, options={}) {
     const result=await (await import('./bake-appearance.mjs')).bakeStudioAppearance(source);environment=result.environment;
     for(const [i,page]of packed.entries()){page.rgb=result.rgb[i];page.width=page.size;page.emission=false;page.mask=Buffer.from(source.pages[i].maps[2].filter((_,k)=>k%4===3));}
   }
+  const display=measureDensity(source.batches,packed);
+  if(source.thumbnail)await writeFile(resolve(output,'source-thumbnail.webp'),source.thumbnail.mime==='image/webp'?source.thumbnail.bytes:await sharp(source.thumbnail.bytes).webp({quality:90,alphaQuality:100}).toBuffer());
   const fixed = [];
   for (const page of packed) fixed.push(await lossless(page.geometry,page.size*2,page.size));
   const rows = [];
@@ -202,7 +210,7 @@ export async function exportImg3d(input, output, options={}) {
       images.push(color,fixed[index],shading);
     }
     const psnr = squared ? 10*Math.log10(255*255/(squared/samples)) : 99;
-    const metadata = { version:baked?2:1,...(baked?{appearance:'baked'}:{}), pages, batches:source.batches, images:images.map(i => ({ bytes:i.bytes.length, mime:i.mime })) };
+    const metadata = { version:baked?2:1,...(baked?{appearance:'baked'}:{}), display, pages, batches:source.batches, images:images.map(i => ({ bytes:i.bytes.length, mime:i.mime })) };
     const asset = encodeContainer(metadata,images), name = `model-${codec}-${quality}.i3d`;
     await writeFile(resolve(output,name),asset);
     const row={ name,codec,quality,bytes:asset.length,colorBytes:images.filter((_,i)=>i%roleCount===0).reduce((s,i)=>s+i.bytes.length,0),shadingBytes:images.filter((_,i)=>i%roleCount===2).reduce((s,i)=>s+i.bytes.length,0),psnr,meanError:absolute/Math.max(1,samples),maxError,shadingPsnr:shadingSquared?10*Math.log10(255*255/(shadingSquared/shadingSamples)):99,normalRmsDegrees:Math.sqrt(normalSquared/Math.max(1,normalSamples)),geometryLossless:true };
@@ -213,12 +221,14 @@ export async function exportImg3d(input, output, options={}) {
   const color=components.filter(c=>c.row.psnr>=40&&c.row.meanError<=1.5).sort((a,b)=>a.row.colorBytes-b.row.colorBytes)[0];
   const shading=components.filter(c=>c.row.shadingPsnr>=40&&c.row.normalRmsDegrees<=2).sort((a,b)=>a.row.shadingBytes-b.row.shadingBytes)[0];
   const images=color.images.map((image,i)=>i%roleCount===2?shading.images[i]:image);
-  const metadata={version:baked?2:1,...(baked?{appearance:'baked'}:{}),pages:color.pages,batches:source.batches,images:images.map(i=>({bytes:i.bytes.length,mime:i.mime}))};
+  const metadata={version:baked?2:1,...(baked?{appearance:'baked'}:{}),display,pages:color.pages,batches:source.batches,images:images.map(i=>({bytes:i.bytes.length,mime:i.mime}))};
   const hybrid=encodeContainer(metadata,images);
   await writeFile(resolve(output,'model-hybrid.i3d'),hybrid);
   rows.push({...color.row,name:'model-hybrid.i3d',shadingCodec:shading.row.codec,shadingQuality:shading.row.quality,shadingBytes:shading.row.shadingBytes,shadingPsnr:shading.row.shadingPsnr,normalRmsDegrees:shading.row.normalRmsDegrees,bytes:hybrid.length});
   const best = rows.filter(row => row.psnr >= 40 && row.meanError <= 1.5 && row.shadingPsnr>=40 && row.normalRmsDegrees<=2).sort((a,b) => a.bytes-b.bytes)[0];
-  return writeDemo(output,{appearance:baked?'baked':'pbr',environment,sourceSha256:createHash('sha256').update(input).digest('hex'),sourceBytes:input.length,codecVersions:sharp.versions,qualityGate:{colorPsnr:40,colorMeanError:1.5,shadingPsnr:40,normalRmsDegrees:2,renderedPsnr:40},displayConversions:source.conversions,boxes:source.batches.reduce((s,b) => s+b.boxes.length,0),pages:source.pages.length,textureGpuBytes:packed.reduce((sum,p)=>sum+p.width*p.size*4+p.size*p.size*(baked?8:14),0),rows,best,selection:'provisional: run validate.mjs to qualify rendered views'});
+  const result=await writeDemo(output,{display,appearance:baked?'baked':'pbr',environment,sourceSha256:createHash('sha256').update(input).digest('hex'),sourceBytes:input.length,codecVersions:sharp.versions,qualityGate:{colorPsnr:40,colorMeanError:1.5,shadingPsnr:40,normalRmsDegrees:2,renderedPsnr:40},displayConversions:source.conversions,...(source.thumbnail?{thumbnail:{file:'source-thumbnail.webp',mime:'image/webp'}}:{}),boxes:source.batches.reduce((s,b) => s+b.boxes.length,0),pages:source.pages.length,textureGpuBytes:packed.reduce((sum,p)=>sum+p.width*p.size*4+p.size*p.size*(baked?8:14),0),rows,best,selection:'provisional: run validate.mjs to qualify rendered views'});
+  if(options.webp){const {createImagePackage}=await import('./package-image.mjs'),input=await readFile(resolve(output,'model.i3d'));const packaged=await createImagePackage(input,{thumbnail:source.thumbnail?.bytes});await writeFile(resolve(output,'model.webp'),packaged.bytes);result.webp={name:'model.webp',bytes:packaged.bytes.length,posterBytes:packaged.posterBytes,width:packaged.display.width,height:packaged.display.height,effectiveWidth:packaged.display.effectiveWidth,captureSha256:createHash('sha256').update(input).digest('hex')};await writeFile(resolve(output,'metrics.json'),JSON.stringify(result,null,2));}
+  return result;
 }
 
 /** @template {{best:{name:string,codec:string,bytes:number}}} T
@@ -238,6 +248,8 @@ export async function writeDemo(output,metrics) {
   const standalone = `${head}${body.replace('model.i3d',`data:application/octet-stream;base64,${base64}`)}<script type="module">${code}</script>`;
   await writeFile(resolve(output,'standalone.html'),standalone);
   const result={...metrics,runtime:{node:process.version,zlib:process.versions.zlib,sha256:createHash('sha256').update(code).digest('hex'),bytes:code.length,gzipBytes:gzipSync(code).length,brotliBytes:brotliCompressSync(code).length},package:{bytes:best.bytes+code.length+Buffer.byteLength(html),gzipBytes:best.bytes+gzipSync(code).length+gzipSync(html).length,standaloneBytes:Buffer.byteLength(standalone),standaloneBrotliBytes:brotliCompressSync(standalone).length}};
+  const image=Reflect.get(metrics,'webp'),captureSha256=createHash('sha256').update(await readFile(resolve(output,'model.i3d'))).digest('hex');
+  if(image&&image.captureSha256!==captureSha256){const {createImagePackage}=await import('./package-image.mjs'),packaged=await createImagePackage(await readFile(resolve(output,'model.i3d')),{runtime,thumbnail:Reflect.get(metrics,'thumbnail')?await readFile(resolve(output,'source-thumbnail.webp')):undefined});await writeFile(resolve(output,'model.webp'),packaged.bytes);Reflect.set(result,'webp',{name:'model.webp',bytes:packaged.bytes.length,posterBytes:packaged.posterBytes,width:packaged.display.width,height:packaged.display.height,effectiveWidth:packaged.display.effectiveWidth,captureSha256});}
   await writeFile(resolve(output,'metrics.json'),JSON.stringify(result,null,2));
   return result;
 }
@@ -245,6 +257,6 @@ export async function writeDemo(output,metrics) {
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const [input, output] = process.argv.slice(2);
   if (!input || !output) throw Error('Usage: node tools/export.mjs box-impostor.glb output-directory');
-  const metrics = await exportImg3d(await readFixture(input),resolve(output),{baked:process.argv.includes('--baked')});
-  console.log(JSON.stringify({best:metrics.best,runtime:metrics.runtime,package:metrics.package},null,2));
+  const metrics = await exportImg3d(await readFixture(input),resolve(output),{baked:process.argv.includes('--baked'),webp:process.argv.includes('--webp')});
+  console.log(JSON.stringify({best:metrics.best,display:metrics.display,webp:metrics.webp,runtime:metrics.runtime,package:metrics.package},null,2));
 }
