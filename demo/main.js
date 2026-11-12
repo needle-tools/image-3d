@@ -5,8 +5,10 @@ const models=__MODELS__;
 const byId=id=>document.getElementById(id),model=byId('model'),resolution=byId('resolution'),appearance=byId('appearance'),viewer=byId('viewer'),turntable=byId('turntable'),light=byId('light'),many=byId('many'),reference=byId('reference'),grid=byId('grid'),stage=byId('stage'),view=byId('view'),gridSize=byId('gridSize');
 const bytes=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':(n/1000).toFixed(1)+' KB';let generation=0,decoder,lightingModule,studio,tiles=[],animation=0,stageVisible=true,gridVisible=false;
 const native=byId('native'),nativePicture=byId('nativePicture'),nativeImage=byId('nativeImage');let nativeController,runtimeModule;
-const follow=byId('follow');let gridInteraction,turntableModule,runtime;
-const state=readState(location.search,models);
+const follow=byId('follow'),fixed=byId('fixed');let gridInteraction,turntableModule,runtime;
+const state=readState(location.search,models);fixed.checked=state.fixed;
+function setFraming(el){const mode=fixed.checked?'fixed':'auto';if(el.dataset.orbitFit!==mode)el.dataset.orbitFit=mode;}
+function applyFraming(){for(const el of [viewer,nativeImage,...tiles.filter(el=>el.localName==='img-3d')])setFraming(el);}
 function sources(m,mode){return m.resolutions.map(r=>{const v=r.variants.find(v=>v.id===mode);return{src:v.image?.src??v.src,width:v.image.width};});}
 const nativeSlot=()=>Math.max(1,Math.min(nativeImage.clientWidth||innerWidth,(nativeImage.clientHeight||innerHeight)*Number(nativeImage.getAttribute('width'))/Number(nativeImage.getAttribute('height'))));
 function configureImage(m,mode,size){
@@ -29,7 +31,7 @@ for(const m of models)model.add(new Option(m.label,m.id));
 function controls(){const m=models.find(m=>m.id===model.value),size=resolution.value,mode=appearance.value;resolution.replaceChildren(...m.resolutions.map(r=>new Option(String(r.size),String(r.size))),...(mode==='webp'?[]:[new Option('Auto','auto')]));if(size==='auto'&&mode!=='webp'||m.resolutions.some(r=>String(r.size)===size))resolution.value=size;const r=m.resolutions.find(r=>String(r.size)===resolution.value)??m.resolutions[0];appearance.replaceChildren(...r.variants.map(v=>new Option(v.name,v.id)));appearance.value=r.variants.some(v=>v.id===mode)?mode:'baked';}
 function restore(state){
  model.value=state.model;controls();resolution.value=String(state.resolution);controls();appearance.value=state.appearance;
- native.checked=state.native;many.checked=state.grid;light.checked=state.light;reference.checked=state.reference;follow.checked=state.follow;gridSize.value=state.size;byId('measurements').open=state.measurements;resizeGrid();
+ native.checked=state.native;many.checked=state.grid;light.checked=state.light;reference.checked=state.reference;follow.checked=state.follow;fixed.checked=state.fixed;gridSize.value=state.size;byId('measurements').open=state.measurements;resizeGrid();
 }
 restore(state);
 function selected(){const m=models.find(m=>m.id===model.value),current=resolution.value==='auto'?(native.checked&&!native.disabled?nativeController?.element:viewer)?.currentSrc:null,r=m.resolutions.find(r=>resolution.value==='auto'?r.variants.some(v=>current?.endsWith('/'+v.src)||current?.endsWith('/'+v.image?.src)):String(r.size)===resolution.value)??m.resolutions[0];return [m,r,r.variants.find(v=>v.id===appearance.value)];}
@@ -93,7 +95,7 @@ stage.addEventListener('load',refreshMeasurements,true);grid.addEventListener('l
 new ResizeObserver(()=>{if(native.checked&&resolution.value==='auto')nativeImage.sizes=nativeSlot()+'px';}).observe(nativeImage);
 async function update(){
  cancelAnimationFrame(animation);gridInteraction?.clear();comparisonDrag=null;
- const stamp=++generation,[m,r,v]=selected(),isWebp=v.id==='webp';const oldPose=presented();let el=active();native.disabled=isWebp||many.checked;
+ const stamp=++generation,[m,r,v]=selected(),isWebp=v.id==='webp';const oldPose=presented();let el=active();native.disabled=isWebp||many.checked;fixed.disabled=isWebp;applyFraming();
  byId('error').hidden=true;view.max=r.turntable.frames-1;
  const gridModels=models.map(m=>{const match=m.resolutions.find(res=>res.size===r.size)?.variants.find(item=>item.id===v.id);return{model:m,variant:match};});
  if(many.checked&&gridModels.some(item=>!item.variant))throw Error('The selected appearance and resolution are not available for every model');
@@ -117,7 +119,7 @@ async function update(){
   viewer.removeAttribute('src');turntable.removeAttribute('src');
   const tag=isWebp?'img-turntable':'img-3d';if(tiles[0]?.localName!==tag){grid.replaceChildren();tiles=[];}
   if(!tiles.length)for(let i=0;i<120;i++){const {model}=gridModels[i%gridModels.length];const card=document.createElement('figure'),tile=document.createElement(tag),caption=document.createElement('figcaption');tile.setAttribute('aria-label',model.label);tile.dataset.model=model.id;tile.dataset.instance=String(i);caption.textContent=model.label;card.title=model.label;card.append(tile,caption);tiles.push(tile);grid.append(card);}
-  for(const [index,tile]of tiles.entries()){const initial=gridModels[index%gridModels.length].variant.image;if(initial){tile.width=initial.width;tile.height=initial.height;}if(!isWebp){tile.lighting=liveLighting;tile.srcset=resolution.value==='auto'?sources(gridModels[index%gridModels.length].model,v.id).map(c=>c.src+' '+c.width+'w').join(', '):'';}const variant=gridModels[index%gridModels.length].variant,src=variant.image?.src??variant.src;if(tile.src!==src)tile.src=src;}
+  for(const [index,tile]of tiles.entries()){const initial=gridModels[index%gridModels.length].variant.image;if(initial){tile.width=initial.width;tile.height=initial.height;}if(!isWebp){setFraming(tile);tile.lighting=liveLighting;tile.srcset=resolution.value==='auto'?sources(gridModels[index%gridModels.length].model,v.id).map(c=>c.src+' '+c.width+'w').join(', '):'';}const variant=gridModels[index%gridModels.length].variant,src=variant.image?.src??variant.src;if(tile.src!==src)tile.src=src;}
  }else{
   grid.replaceChildren();tiles=[];const other=isWebp?viewer:turntable;other.removeAttribute('src');if(!useNative){if(!isWebp){el.width=v.image.width;el.height=v.image.height;}if(!isWebp)el.srcset=resolution.value==='auto'?sources(m,v.id).map(c=>c.src+' '+c.width+'w').join(', '):'';const src=v.image?.src??v.src;if(el.src!==src)el.src=src;}
   if(compare){referenceViewer.yaw=el.yaw;const src=r.variants.find(v=>v.id==='webp').src;if(referenceViewer.src!==src)referenceViewer.src=src;else referenceViewer.draw();}
@@ -126,11 +128,12 @@ async function update(){
 }
 function resizeGrid(){grid.style.setProperty('--item-size',gridSize.value+'px');byId('gridSizeValue').value=gridSize.value+' px';gridInteraction?.refresh();}
 gridSize.oninput=()=>{resizeGrid();save();};
+fixed.onchange=()=>{applyFraming();save(true);};
 follow.onchange=()=>{gridInteraction?.setEnabled(follow.checked);save(true);};
 const change=()=>{save(true);return update().catch(error=>{byId('error').textContent=error.message;byId('error').hidden=false;});};model.onchange=resolution.onchange=()=>{controls();change();};appearance.onchange=()=>{controls();change();};native.onchange=many.onchange=reference.onchange=light.onchange=change;view.oninput=matchView;
 byId('reset').onclick=()=>{if(many.checked){gridInteraction?.clear();for(const tile of tiles)tile.reset();}else if(comparing())referenceViewer.reset();else active().reset();save();};
 function save(push=false){
- const pose=pendingPose??presented();const value={model:model.value,resolution:resolution.value==='auto'?'auto':Number(resolution.value),native:native.checked,appearance:appearance.value,grid:many.checked,light:light.checked,reference:reference.checked,follow:follow.checked,size:Number(gridSize.value),measurements:byId('measurements').open,yaw:pose.yaw??state.yaw,pitch:pose.pitch??state.pitch,distance:pose.distance??state.distance};
+ const pose=pendingPose??presented();const value={model:model.value,resolution:resolution.value==='auto'?'auto':Number(resolution.value),native:native.checked,appearance:appearance.value,grid:many.checked,light:light.checked,reference:reference.checked,follow:follow.checked,fixed:fixed.checked,size:Number(gridSize.value),measurements:byId('measurements').open,yaw:pose.yaw??state.yaw,pitch:pose.pitch??state.pitch,distance:pose.distance??state.distance};
  const next=stateUrl(location.href,value);if(next.href!==location.href)history[push?'pushState':'replaceState'](null,'',next);
 }
 let pendingPose={yaw:state.yaw,pitch:state.pitch,distance:state.distance},poseTimer;

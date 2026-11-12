@@ -8,7 +8,7 @@ export declare class Img3d extends HTMLElement {
   /** Candidate widths are converter-measured usable frame pixels, not atlas sizes. */
   srcset: string;
   readonly currentSrc: string;
-  /** Keep capture framing fixed, or automatically widen it to avoid clipping during orbit. */
+  /** Reflects data-orbit-fit: keep capture framing fixed by default, or opt into auto framing to avoid clipping during orbit. */
   orbitFit: 'auto' | 'fixed';
   readonly naturalWidth: number;
   readonly naturalHeight: number;
@@ -43,5 +43,5 @@ export declare function registerImg3dDecoder(decoder: {
   dispose(): void;
 }): void;
 
-/** Enhance a native WebP img/picture using the browser's currentSrc; disconnect restores the original image. */
+/** Enhance a native WebP img/picture using currentSrc and the img's data-orbit-fit attribute; disconnect restores the original image. */
 export declare function enhanceImage(target:HTMLImageElement|HTMLPictureElement):{image:HTMLImageElement;element:Img3d;disconnect():void};

@@ -49,6 +49,8 @@ test('measured portrait and landscape frames fit slots, match native posters and
     assert(b.x0>0&&b.y0>0&&b.x1<w-1&&b.y1<h-1,label+' clipped the surface');
     assert(Math.max(b.width/fw,b.height/fh)>.85,label+' retained excessive empty padding');
    }
+   // Automatic framing remains the opt-in path that keeps every orbit visible.
+   await page.locator('img-3d').evaluate(el=>{el.orbitFit='auto';});
    for(const [yaw,pitch]of [[0,1.2],[1.2,-1.2],[Math.PI,.35]]){const b=await render(160,480,yaw,pitch);assert(b.x0>0&&b.y0>0&&b.x1<159&&b.y1<479,backend+' '+model+' orbit cropped the surface');}
    const focus=await page.locator('img-3d').evaluate(el=>{el.canvas.focus();return getComputedStyle(el.canvas).outlineStyle;});assert.equal(focus,'none');
    const yaw=await page.locator('img-3d').evaluate(el=>el.yaw);await page.locator('img-3d canvas').press('ArrowRight');assert.equal(await page.locator('img-3d').evaluate(el=>el.yaw),yaw+.1);

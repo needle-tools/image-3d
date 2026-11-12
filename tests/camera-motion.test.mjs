@@ -39,3 +39,42 @@ test('camera motion starts at the poster, eases drag input, settles and preserve
   await page.close();
  }}}finally{await browser.close();await new Promise(r=>server.close(r));}
 });
+
+test('continuous dragging advances displayed poses and settles without idle redraws',{timeout:120000},async()=>{
+ const runtime=await readFile('dist/img-3d.js'),model=await readFile('demo/public/owl-512-i3d/baked.webp');
+ const server=createServer((req,res)=>{res.setHeader('Content-Type',req.url==='/runtime.js'?'text/javascript':req.url==='/model.webp'?'image/webp':'text/html');res.end(req.url==='/runtime.js'?runtime:req.url==='/model.webp'?model:'<!doctype html><style>body{margin:0}img-3d,picture,img{display:block;width:240px;height:320px;object-fit:contain}picture{position:relative}</style>'+(req.url==='/native'?'<picture><img data-img-3d src="/model.webp"></picture>':'<img-3d src="/model.webp"></img-3d>')+'<script type="module" src="/runtime.js"></script>');});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({channel:'chrome',headless:true});
+ try{for(const backend of backends)for(const native of [false,true]){
+  const label=backend+(native?' native':' custom');
+  const page=await browser.newPage({viewport:{width:600,height:600}});await useBackend(page,backend);await page.goto('http://127.0.0.1:'+server.address().port+(native?'/native':''));await page.waitForFunction(()=>document.querySelector('img-3d')?.data);
+  await page.evaluate(()=>{window.el=document.querySelector('img-3d');window.shown=[];
+   const record=canvas=>{if(canvas!==el.canvas)return;const pose=el.renderCamera??el;shown.push({yaw:pose.yaw,time:performance.now()});};
+   if(globalThis.GPUCanvasContext){const current=GPUCanvasContext.prototype.getCurrentTexture;GPUCanvasContext.prototype.getCurrentTexture=function(...args){record(this.canvas);return current.apply(this,args);};}
+   const copy=CanvasRenderingContext2D.prototype.drawImage;CanvasRenderingContext2D.prototype.drawImage=function(...args){record(this.canvas);return copy.apply(this,args);};
+  });
+  const box=await page.locator('img-3d canvas').boundingBox(),x=box.x+box.width/2,y=box.y+box.height/2;
+  await page.mouse.move(x,y);await page.mouse.down();
+  const during=await page.evaluate(({x,y})=>new Promise(resolve=>{
+   let frame=0;const start=el.yaw,samples=[];
+   function move(){
+    if(frame===36){resolve({start,samples,target:el.yaw,shown:[...shown]});return;}
+    // Retarget before the motion callback in each frame, as coalesced input
+    // can do. Scheduling order must not freeze the displayed camera.
+    requestAnimationFrame(move);frame++;
+    el.canvas.dispatchEvent(new PointerEvent('pointermove',{pointerType:'mouse',clientX:x+frame,clientY:y,buttons:1}));
+    samples.push((el.renderCamera??el).yaw);
+   }requestAnimationFrame(move);
+  }),{x,y});
+  assert(Math.abs(during.target-during.start+.36)<1e-6,label+' lost drag input');
+  assert(during.start-during.samples.at(-1)>.25,label+' displayed camera stalled while input continued');
+  assert(during.shown.length>=12,label+' did not present intermediate drag frames');
+  assert(during.shown.every((pose,i)=>!i||pose.yaw<=during.shown[i-1].yaw+1e-8),label+' displayed camera reversed during a one-way drag');
+  const jumps=during.shown.slice(1).map((pose,i)=>Math.abs(pose.yaw-during.shown[i].yaw));assert(Math.max(...jumps)<.08,label+' skipped a large section of the drag');
+  await page.waitForFunction(()=>!el.renderCamera&&customElements.get('img-3d').statistics.pending===0);
+  const held=await page.evaluate(()=>customElements.get('img-3d').statistics.renders);await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>customElements.get('img-3d').statistics.renders),held,label+' redrew while holding a settled drag');
+  await page.mouse.up();
+  const final=await page.evaluate(()=>({yaw:el.yaw,pending:customElements.get('img-3d').statistics.pending}));assert(Math.abs(final.yaw-during.target)<1e-8);
+  await page.waitForFunction(()=>customElements.get('img-3d').statistics.pending===0);const renders=await page.evaluate(()=>customElements.get('img-3d').statistics.renders);await page.waitForTimeout(200);assert.equal(await page.evaluate(()=>customElements.get('img-3d').statistics.renders),renders,label+' redrew a settled camera');
+  await page.close();
+ }}finally{await browser.close();await new Promise(r=>server.close(r));}
+});

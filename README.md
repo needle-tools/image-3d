@@ -116,9 +116,19 @@ Responsive sources use converter-measured frame widths, not atlas sides:
   width="464" height="872" alt="Owl" style="height:auto"></img-3d>
 ```
 
-The critical style reserves space before JavaScript runs. The component supports
-`orbit-fit="fixed"` (or `element.orbitFit = 'fixed'`) to keep a constant scale
-while rotating. The default is `auto`, which widens the frame to avoid clipping.
+The critical style reserves space before JavaScript runs. Both elements accept
+`data-orbit-fit="fixed"` to keep the captured scale and center while rotating:
+
+```html
+<img data-img-3d data-orbit-fit="fixed" src="model.webp" alt="Model">
+<img-3d data-orbit-fit="fixed" src="model.webp"></img-3d>
+```
+
+Fixed framing is the default, and the demo's **Fixed framing** toggle starts on.
+Set `data-orbit-fit="auto"` to widen the frame when rotating would otherwise clip.
+Removing the attribute restores fixed framing. `element.orbitFit = 'fixed'` reflects the same data attribute on
+`<img-3d>`; the earlier `orbit-fit` spelling remains supported on that element, with the data
+attribute taking precedence.
 Fixed framing can clip wider views unless the capture has sufficient margin.
 
 The component supports

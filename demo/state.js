@@ -1,5 +1,5 @@
-export const defaults={model:'owl',resolution:'auto',appearance:'baked',native:false,grid:false,light:false,reference:false,follow:true,size:180,measurements:false,yaw:.55,pitch:.2,distance:4};
-const flags=['native','grid','light','reference','follow','measurements'];
+export const defaults={model:'owl',resolution:'auto',appearance:'baked',native:false,grid:false,light:false,reference:false,follow:true,fixed:true,size:180,measurements:false,yaw:.55,pitch:.2,distance:4};
+const flags=['native','grid','light','reference','follow','fixed','measurements'];
 const number=(params,key,fallback,min,max)=>{const raw=params.get(key),value=raw===null||raw.trim()===''?NaN:Number(raw);return Number.isFinite(value)?Math.max(min,Math.min(max,value)):fallback;};
 export function readState(search,models){
  const p=new URLSearchParams(search),state={...defaults};

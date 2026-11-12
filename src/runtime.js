@@ -668,7 +668,7 @@ addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
 
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {
- static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit'];
+ static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit'];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
   return {backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length,attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
@@ -686,8 +686,8 @@ export class Img3d extends HTMLElement {
  get srcset(){return this.getAttribute('srcset')??'';}
  set srcset(value){if(this.srcset!==value)this.setAttribute('srcset',value);}
  get currentSrc(){return this.url??'';}
- get orbitFit(){return this.getAttribute('orbit-fit')==='fixed'?'fixed':'auto';}
- set orbitFit(value){this.setAttribute('orbit-fit',value);}
+ get orbitFit(){return(this.getAttribute('data-orbit-fit')??this.getAttribute('orbit-fit'))==='auto'?'auto':'fixed';}
+ set orbitFit(value){const mode=value==='auto'?'auto':'fixed';if(this.getAttribute('data-orbit-fit')!==mode)this.setAttribute('data-orbit-fit',mode);}
  get naturalWidth(){return this.metadata?.width??this.data?.display?.width??(this.data?300:0);}
  get naturalHeight(){return this.metadata?.height??this.data?.display?.height??(this.data?300:0);}
  get width(){return this.clientWidth;}
