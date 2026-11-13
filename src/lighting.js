@@ -14,6 +14,7 @@ export function normalizeLighting(value){
   const e=value.environment;
   if(!Number.isInteger(e.size)||e.size<2||e.size>256||!Number.isInteger(e.levels)||e.levels<2||e.levels>16||!(e.data instanceof Uint16Array)||e.data.length!==e.size*e.levels*(e.size+16)*4)throw Error('Invalid prefiltered environment');
   result.environment=e;result.environmentIntensity=finite(value.environmentIntensity,1,8);
+  result.environmentRotation=Number.isFinite(value.environmentRotation)?Math.atan2(Math.sin(value.environmentRotation),Math.cos(value.environmentRotation)):0;
  }
  return result;
 }
@@ -22,14 +23,14 @@ export function lightingState(light){
  const state=[...light.direction,light.intensity,light.ambient];
  if(enhanced(light)){
   let id=0;if(light.environment){if(!ids.has(light.environment))ids.set(light.environment,nextId++);id=ids.get(light.environment);}
-  state.push(id,light.environmentIntensity??1,...(light.lights??[]).flatMap(l=>[...l.direction,...l.color,l.intensity]));
+  state.push(id,light.environmentIntensity??1,light.environmentRotation??0,...(light.lights??[]).flatMap(l=>[...l.direction,...l.color,l.intensity]));
  }
  return state;
 }
 export function studioUniforms(light){
  const values=new Float32Array(28),e=light.environment;
  for(const [i,l]of (light.lights??[]).entries()){const n=Math.hypot(...l.direction)||1;values.set(l.direction.map(v=>v/n),i*8);values[i*8+3]=l.intensity;values.set(l.color,i*8+4);}
- values.set(e?[e.size,e.levels,light.environmentIntensity??1,1]:[2,2,0,0],24);return values;
+ values.set(e?[e.size,e.levels,light.environmentIntensity??1,light.environmentRotation??0]:[2,2,0,0],24);return values;
 }
 export function studioShader(wgsl){
  const f=wgsl?'f32':'float',v2=wgsl?'vec2f':'vec2',v3=wgsl?'vec3f':'vec3',v4=wgsl?'vec4f':'vec4';
@@ -40,7 +41,9 @@ export function studioShader(wgsl){
  const light=i=>wgsl?`view.lights[${i}]`:`studioLights[${i}]`;
  const sources=[];
  sources.push(fn(v2,'studioUv',[[v3,'incoming']],[
-  declare(v3,'n','incoming'),
+  declare(f,'rotation',`${parameters}.w`),
+  declare(f,'c','cos(rotation)'),declare(f,'s','sin(rotation)'),
+  declare(v3,'n',`${v3}(c*incoming.x-s*incoming.z,incoming.y,s*incoming.x+c*incoming.z)`),
   'n/=abs(n.x)+abs(n.y)+abs(n.z);',
   `if(n.z<0.){n=${v3}((1.-abs(n.yx))*sign(n.xy+${v2}(1e-20)),n.z);}`,
   'return n.xy*.5+.5;',

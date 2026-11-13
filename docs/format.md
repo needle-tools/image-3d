@@ -409,10 +409,10 @@ holes and cannot reproduce separate contact points or self-shadowing. It does
 not change lighting, build surface geometry, or run a shadow render each frame.
 
 
-### Screen panning
+### Environment rotation
 
-`panX` and `panY` translate the rendered view in viewport fractions, defaulting
-to zero. Positive X moves the capture right; positive Y moves it down. These
-properties change the projection without changing distance, orbit, fitted bounds
-or authored metadata. Both backends project ground shadows with the same offset.
-The application owns gesture handling, limits and return animation.
+`lighting.environmentRotation` rotates environment lighting around the world Y
+axis in radians, defaulting to zero. It affects diffuse irradiance and specular
+reflections without changing the model, camera, environment intensity or shared
+texture storage. Negative angles are supported; finite angles wrap to a turn.
+The application owns gesture handling and easing back to its initial rotation.
