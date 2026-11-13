@@ -45,7 +45,7 @@ export function groundShadow(data) {
 		}
 		// Smooth across the hull edge, including the interior, to avoid a hard rim.
 		const signed = inside ? -distance : distance;
-		pixels[y * size + x] = Math.round(255 * .32 / (1 + Math.exp(signed / (spread * .45))));
+		pixels[y * size + x] = Math.round(255 * .32 / (1 + Math.exp(signed / (spread * .6))));
 	}
 	const shadow = {size, pixels, bounds, floor: min[1]};
 	cache.set(data, shadow);
