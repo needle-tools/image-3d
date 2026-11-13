@@ -393,3 +393,17 @@ negative-Z hemisphere, then map XY from `[-1,1]` to `[0,1]` before premultiplyin
 
 The format supplies data only. Decoders come from the application, never from
 an asset-provided script, module URL or sidecar.
+
+
+### Optional ground shadow
+
+`element.groundShadow = true` enables a soft black footprint behind the capture.
+The runtime caches one 64 x 64 mask from `display.support` per immutable capture
+and projects it onto the lowest captured Y plane using the current camera.
+It adds 4096 texture bytes per GPU asset; repeated views and camera changes reuse
+that mask. Asset eviction/context recovery follow normal renderer ownership.
+The default remains off. Captures without valid support have no footprint.
+
+This is an approximate soft ground shadow: the convex projected footprint fills
+holes and cannot reproduce separate contact points or self-shadowing. It does
+not change lighting, build surface geometry, or run a shadow render each frame.

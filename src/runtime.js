@@ -270,7 +270,8 @@ const numbers=(v,n)=>Array.isArray(v)&&v.length===n&&v.every(Number.isFinite);
 
 // One hidden WebGL surface supplies ordinary 2D canvases. Browser compositing
 // owns scrolling, clipping and stacking; element count never consumes contexts.
-import {createGpu} from './webgpu.js';
+import {createGpu,camera as renderCamera} from './webgpu.js';
+import {groundShadow,shadowShader} from './ground-shadow.js';
 const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
 /** Optional trusted XUASTC entry; capture files never supply executable code. */
 export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
@@ -460,14 +461,14 @@ async function upload(url,signal){
 function program(key){if(programs.has(key))return programs.get(key);
  const p=gl.createProgram(),define=key.startsWith('studio')?`STUDIO\n#define LIGHT_COUNT ${key.endsWith('3')?3:0}`:key.toUpperCase();
  const vs=key==='resolve'?'#version 300 es\nvoid main(){gl_Position=vec4(float(gl_VertexID/2)*4.-1.,float(gl_VertexID%2)*4.-1.,0,1);}':vertex;
- const fs=key==='resolve'?`#version 300 es\nprecision highp float;uniform sampler2D image;uniform vec4 area;out vec4 outputColor;${antialiasShader(false)}\nvoid main(){outputColor=resolvePixel(gl_FragCoord.xy);}`:key==='pbr'?fragment:fragment.replace('precision highp float;',`#define ${define}\nprecision highp float;`);
+ const fs=key==='resolve'?`#version 300 es\nprecision highp float;uniform sampler2D image;uniform vec4 area;out vec4 outputColor;${antialiasShader(false)}${shadowShader(false)}\nvoid main(){outputColor=ground(resolvePixel(gl_FragCoord.xy),gl_FragCoord.xy);}`:key==='pbr'?fragment:fragment.replace('precision highp float;',`#define ${define}\nprecision highp float;`);
  for(const [kind,source]of [[gl.VERTEX_SHADER,vs],[gl.FRAGMENT_SHADER,fs]]){
   const shader=gl.createShader(kind);gl.shaderSource(shader,source);gl.compileShader(shader);
   if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)){const message=gl.getShaderInfoLog(shader);gl.deleteShader(shader);gl.deleteProgram(p);throw Error(message);}
   gl.attachShader(p,shader);gl.deleteShader(shader);
  }
  gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS)){const message=gl.getProgramInfoLog(p);gl.deleteProgram(p);throw Error(message);}
- const locations={};for(const name of ['eye','right','up','forward','aspect','focal','frameTransform','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','studioMap','studioLights','environmentParams','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin','image','area'])locations[name]=gl.getUniformLocation(p,name);
+ const locations={};for(const name of ['eye','right','up','forward','aspect','focal','frameTransform','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','studioMap','studioLights','environmentParams','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin','image','area','shadowMap','inverseCamera','shadowEye','shadowBounds','shadowParams'])locations[name]=gl.getUniformLocation(p,name);
  const result={program:p,locations};programs.set(key,result);return result;
 }
 function dropSurface(el){
@@ -542,7 +543,7 @@ function copy(el,{x,y,w,h}){
  const ctx=el.canvasContext??=el.canvas.getContext('2d');ctx.clearRect(0,0,w,h);ctx.drawImage(surface,x,surface.height-y-h,w,h,0,0,w,h);renders++;
 }
 function resolveLive(finished){
- const live=finished.filter(({view,asset})=>asset.data.appearance!=='baked'&&enhanced(view.el.lighting));if(!live.length)return;
+ const live=finished.filter(({view,asset})=>view.el.groundShadow||asset.data.appearance!=='baked'&&enhanced(view.el.lighting));if(!live.length)return;
  const w=surface.width,h=surface.height;
  if(!resolveTexture||resolveTexture.w!==w||resolveTexture.h!==h){
   if(resolveTexture)gl.deleteTexture(resolveTexture.texture);resolveTexture={texture:gl.createTexture(),w,h};gl.bindTexture(gl.TEXTURE_2D,resolveTexture.texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
@@ -551,13 +552,28 @@ function resolveLive(finished){
  }
  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,resolveTexture.texture);gl.copyTexSubImage2D(gl.TEXTURE_2D,0,0,0,0,0,w,h);
  const {program:p,locations:u}=program('resolve');gl.useProgram(p);gl.uniform1i(u.image,0);gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.disable(gl.BLEND);
- const seen=new Set();for(const {view}of live){if(seen.has(view.key))continue;seen.add(view.key);const {x,y,w,h}=view;gl.viewport(x,y,w,h);gl.scissor(x,y,w,h);gl.uniform4f(u.area,x,y,w,h);gl.drawArrays(gl.TRIANGLES,0,3);}
+ const seen=new Set();
+ for(const {view,asset}of live){
+  if(seen.has(view.key))continue;seen.add(view.key);
+  const {x,y,w,h,el}=view,shadow=el.groundShadow?groundShadow(asset.data):null;
+  if(shadow&&!asset.shadowTexture){
+   const texture=gl.createTexture();asset.shadowTexture=texture;asset.textures.push(texture);asset.bytes+=shadow.pixels.length;
+   gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.R8,shadow.size,shadow.size,0,gl.RED,gl.UNSIGNED_BYTE,shadow.pixels);
+   for(const parameter of [gl.TEXTURE_MIN_FILTER,gl.TEXTURE_MAG_FILTER])gl.texParameteri(gl.TEXTURE_2D,parameter,gl.LINEAR);
+   for(const parameter of [gl.TEXTURE_WRAP_S,gl.TEXTURE_WRAP_T])gl.texParameteri(gl.TEXTURE_2D,parameter,gl.CLAMP_TO_EDGE);
+  }
+  const camera=renderCamera(el,w,h);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,asset.shadowTexture??resolveTexture.texture);gl.uniform1i(u.shadowMap,1);
+  gl.uniformMatrix4fv(u.inverseCamera,false,camera.inverse);gl.uniform3fv(u.shadowEye,camera.eye);
+  gl.uniform4fv(u.shadowBounds,shadow?.bounds??[0,0,1,1]);gl.uniform2f(u.shadowParams,shadow?.floor??0,shadow?1:0);
+  gl.viewport(x,y,w,h);gl.scissor(x,y,w,h);gl.uniform4f(u.area,x,y,w,h);gl.drawArrays(gl.TRIANGLES,0,3);
+ }
 }
 // Automatic updates compare rendered inputs, independent of what caused them.
 // Explicit draw() still refreshes the canvas for immediate pixel readback.
 function viewState(el,asset,w,h){
  const light=el.lighting,camera=cameraPose(el);
- return[asset,el.generation,api??gl,epoch,el.canvas,w,h,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
+ return[asset,el.generation,api??gl,epoch,el.canvas,w,h,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,el.groundShadow,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
 }
 function sameView(el,state){const old=lastRendered.get(el);return old?.length===state.length&&state.every((value,i)=>Object.is(value,old[i]));}
 function dimensions(el){const camera=cameraPose(el),ratio=Math.min(devicePixelRatio||1,2),style=getComputedStyle(el),[w,h]=contentSize(el,style),key=[w,h,style.objectFit,style.objectPosition,el.orbitFit,el.frameRatio,el.naturalWidth,el.metadata,...(el.metadata?.frame??el.data?.display?.frame??[]),...(el.metadata?.support&&el.orbitFit!=='fixed'?[camera.yaw,camera.pitch]:[])];if(!el.layoutKey||key.some((v,i)=>v!==el.layoutKey[i])){el.layoutKey=key;el.layout=frameLayout(el,w,h,style);el.layoutSignature=[el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy,el.frameRatio];}return[Math.max(1,Math.round(w*ratio)),Math.max(1,Math.round(h*ratio))];}
@@ -583,7 +599,7 @@ function layout(){
   if(!job.ready)continue;
   const [w,h]=dimensions(el);
   if(!job.force&&job.asset&&!job.error&&sameView(el,viewState(el,job.asset,w,h))){pending.delete(el);job.resolve(false);continue;}
-  const camera=cameraPose(el),key=JSON.stringify([el.url,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,w,h,job.asset?.data.appearance==='baked'?null:lightingState(el.lighting)]),region=regions.get(key);
+  const camera=cameraPose(el),key=JSON.stringify([el.url,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,w,h,el.groundShadow,job.asset?.data.appearance==='baked'?null:lightingState(el.lighting)]),region=regions.get(key);
   if(region){views.push({el,job,key,...region});continue;}
   if(x&&x+w>Math.max(limit,w)){x=0;y+=row;row=0;}
   if(views.length&&y+h>limit)break;
@@ -682,6 +698,8 @@ export class Img3d extends HTMLElement {
   const previous=this.light?.environment;this.light=normalizeLighting(value);if(previous!==this.light.environment)trimCaches();
   enqueue(this);
  }
+ get groundShadow(){return this.shadowEnabled??false;}
+ set groundShadow(value){this.shadowEnabled=!!value;enqueue(this);}
  get src(){return this.getAttribute('src')??'';}
  set src(value){this.setAttribute('src',value);}
  get srcset(){return this.getAttribute('srcset')??'';}
@@ -766,7 +784,12 @@ export class Img3d extends HTMLElement {
   })();
  }
  fail(error){cameraMotion.stop(this);this.data=null;this.loadedGeneration=-1;blank(this);const asset=gpu.get(this.url);if(asset)lastRendered.set(this,viewState(this,asset,...dimensions(this)));this.status.textContent=error.message;this.dispatchEvent(new CustomEvent('error',{detail:error}));}
- draw(){this.skipIntro=true;cameraMotion.stop(this);return this.loadingUrl&&!this.adaptiveLoad?this.loadTask:enqueue(this,true);}
+ draw(){
+  this.skipIntro=true;cameraMotion.stop(this);
+  // A load event can change camera settings before its first enqueue completes.
+  // Explicit draw must present those new settings, not return that earlier frame.
+  return this.loadingUrl&&!this.adaptiveLoad?this.loadTask.then(shown=>shown?enqueue(this,true):false):enqueue(this,true);
+ }
 }
 if(customElements.get('img-3d'))Img3d=customElements.get('img-3d');else customElements.define('img-3d',Img3d);
 

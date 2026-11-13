@@ -2,6 +2,7 @@ import {cameraPose} from './camera-motion.js';
 import {enhanced,studioUniforms,studioShader} from './lighting.js';
 import {surfaceCrossingWgsl} from './surface-shader.js';
 import {antialiasShader} from './antialias.js';
+import {groundShadow,shadowShader} from './ground-shadow.js';
 // MIT. Preferred img-3d backend. One shared GPUDevice renders every element of
 // a frame together: visibility and shading over one shared atlas (plus
 // translucent layers), then one GPU texture copy of each element's region into
@@ -298,14 +299,18 @@ async function setup(device,format,features){
  const [visible,clear,pbr,baked,pbrBlend,bakedBlend]=await Promise.all([vis,reset,shading(false,false),shading(true,false),shading(false,true),shading(true,true)]),pipelines={visible,clear,pbr,baked,pbrBlend,bakedBlend};
  const [studio,studioBlend,cinematic,cinematicBlend]=await Promise.all([shading(false,false,true),shading(false,true,true),shading(false,false,true,true),shading(false,true,true,true)]);Object.assign(pipelines,{studio,studioBlend,cinematic,cinematicBlend});
  const resolveModule=device.createShaderModule({code:`
- struct View{padding:array<vec4f,12>,area:vec4f}
+ struct View{matrix:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,padding:array<vec4f,3>,area:vec4f}
+ struct Shadow{bounds:vec4f,params:vec4f}
+ @group(0) @binding(2) var shadowMap:texture_2d<f32>;
+ @group(0) @binding(3) var<uniform> shadow:Shadow;
  @group(0) @binding(0) var image:texture_2d<f32>;
  @group(0) @binding(1) var linearSampler:sampler;
  @group(1) @binding(0) var<uniform> view:View;
  ${antialiasShader(true)}
+ ${shadowShader(true)}
  @vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(f32(i/2u)*4-1,f32(i%2u)*4-1,0,1);}
- @fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{return resolvePixel(p.xy);}`});
- const resolveLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}}]});
+ @fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{return ground(resolvePixel(p.xy),p.xy);}`});
+ const resolveLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}},{binding:2,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:3,visibility:GPUShaderStage.FRAGMENT,buffer:{minBindingSize:32}}]});
  const resolvePipeline=await device.createRenderPipelineAsync({layout:device.createPipelineLayout({bindGroupLayouts:[resolveLayout,viewLayout]}),vertex:{module:resolveModule,entryPoint:'vs'},fragment:{module:resolveModule,entryPoint:'fs',targets:[{format}]}});
  const environments=new Map();
  function studioBinding(light){
@@ -437,7 +442,7 @@ async function setup(device,format,features){
    return asset;
   }catch(error){destroy(asset);throw error;}
  }
- function destroy(asset){for(const t of asset.textures)t.destroy();asset.disposed=true;}
+ function destroy(asset){asset.groundResolve?.buffer.destroy();asset.plainResolve?.buffer.destroy();for(const t of asset.textures)t.destroy();asset.disposed=true;}
  // Each draw's uniforms get their own offset; full segments continue in another
  // pooled buffer, and every segment is written once before the frame's submit.
  const SEGMENT=256;
@@ -533,11 +538,25 @@ async function setup(device,format,features){
     region(pass,item.rect);pass.setPipeline(shadePipeline(item,true));pass.setBindGroup(2,layer.read);screen(frame,pass,item,[batch],item.rect,[0,0,0,0]);pass.end();
    }
    const entries=new WeakMap();for(const item of items)entries.set(item.el,pose(item));retained={atlas:a,entries};
-   const live=items.filter(item=>item.asset.data.appearance!=='baked'&&enhanced(item.el.lighting));
+   const live=items.filter(item=>item.el.groundShadow||item.asset.data.appearance!=='baked'&&enhanced(item.el.lighting));
    if(live.length){
-    if(!a.resolved){a.resolved=device.createTexture({size:[a.width,a.height],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});a.textures.push(a.resolved);a.bytes+=a.width*a.height*4;a.resolveGroup=device.createBindGroup({layout:resolveLayout,entries:[{binding:0,resource:a.color.createView()},{binding:1,resource:sampler}]});}
-    pass=encoder.beginRenderPass({colorAttachments:[{view:a.resolved.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});pass.setPipeline(resolvePipeline);pass.setBindGroup(0,a.resolveGroup);
-    for(const item of live){region(pass,item.rect);const batch=item.asset.batches[0],[uniforms,offset]=slot(frame,item.view,item.el,batch,item.asset.data.pages[batch.page],0,item.rect);pass.setBindGroup(1,uniforms,[offset]);pass.draw(3);}pass.end();
+    if(!a.resolved){a.resolved=device.createTexture({size:[a.width,a.height],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.COPY_SRC});a.textures.push(a.resolved);a.bytes+=a.width*a.height*4;}
+    pass=encoder.beginRenderPass({colorAttachments:[{view:a.resolved.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});pass.setPipeline(resolvePipeline);
+    for(const item of live){
+     const {asset,el}=item,shadow=el.groundShadow?groundShadow(asset.data):null;
+     const key=shadow?'groundResolve':'plainResolve';
+     let record=asset[key];
+     if(!record){
+      const mask=texture(asset,[shadow?.size??1,shadow?.size??1],'r8unorm');
+      device.queue.writeTexture({texture:mask},shadow?.pixels??new Uint8Array(1),{bytesPerRow:shadow?.size??1},[shadow?.size??1,shadow?.size??1]);
+      const buffer=device.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});
+      const values=new Float32Array(8);values.set(shadow?.bounds??[0,0,1,1]);values[4]=shadow?.floor??0;values[5]=shadow?1:0;device.queue.writeBuffer(buffer,0,values);
+      record={mask,buffer};asset[key]=record;asset.bytes+=shadow?.pixels.length??1;
+     }
+     if(record.atlas!==a){record.atlas=a;record.group=device.createBindGroup({layout:resolveLayout,entries:[{binding:0,resource:a.color.createView()},{binding:1,resource:sampler},{binding:2,resource:record.mask.createView()},{binding:3,resource:{buffer:record.buffer}}]});}
+     region(pass,item.rect);pass.setBindGroup(0,record.group);
+     const batch=asset.batches[0],[uniforms,offset]=slot(frame,item.view,el,batch,asset.data.pages[batch.page],0,item.rect);pass.setBindGroup(1,uniforms,[offset]);pass.draw(3);
+    }pass.end();
    }
    for(const item of items)encoder.copyTextureToTexture({texture:live.includes(item)?a.resolved:a.color,origin:[item.rect[0],item.rect[1]]},{texture:item.el.gpuContext.getCurrentTexture()},[item.w,item.h]);
   }

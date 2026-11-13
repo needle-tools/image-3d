@@ -22,6 +22,8 @@ export declare class Img3d extends HTMLElement {
   /** Live PBR lighting. The optional studio path uses ACES and up to three colored lights; baked captures ignore lighting. Environment data is immutable and shared across elements. */
   get lighting(): {direction: number[]; intensity: number; ambient: number; lights?: Array<{direction:number[];color:number[];intensity:number}>;environment?:Img3dEnvironment;environmentIntensity?:number};
   set lighting(value: {direction?: [number, number, number]; intensity?: number; ambient?: number;lights?:Array<{direction:[number,number,number];color?:[number,number,number];intensity?:number}>;environment?:Img3dEnvironment;environmentIntensity?:number} | null);
+  /** Optional cached soft ground footprint; off by default. Not a ray-traced contact shadow. */
+  groundShadow: boolean;
   readonly canvas: HTMLCanvasElement;
   yaw: number;
   pitch: number;
