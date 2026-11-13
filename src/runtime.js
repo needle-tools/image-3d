@@ -1,5 +1,5 @@
 import {cameraPose,createCameraMotion} from './camera-motion.js';
-import {boundsFrame,orbitEye} from './bounds-fit.js';
+import {boundsFrame,orbitEye,panFrame} from './bounds-fit.js';
 import {enhanceImage,installNativeImages} from './native-image.js';
 export {enhanceImage};
 import {captureBytes} from './container.js';
@@ -576,7 +576,7 @@ function viewState(el,asset,w,h){
  return[asset,el.generation,api??gl,epoch,el.canvas,w,h,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,el.groundShadow,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
 }
 function sameView(el,state){const old=lastRendered.get(el);return old?.length===state.length&&state.every((value,i)=>Object.is(value,old[i]));}
-function dimensions(el){const camera=cameraPose(el),ratio=Math.min(devicePixelRatio||1,2),style=getComputedStyle(el),[w,h]=contentSize(el,style),key=[w,h,style.objectFit,style.objectPosition,el.orbitFit,el.frameRatio,el.naturalWidth,el.metadata,...(el.metadata?.frame??el.data?.display?.frame??[]),...(el.metadata?.support&&el.orbitFit!=='fixed'?[camera.yaw,camera.pitch]:[])];if(!el.layoutKey||key.some((v,i)=>v!==el.layoutKey[i])){el.layoutKey=key;el.layout=frameLayout(el,w,h,style);el.layoutSignature=[el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy,el.frameRatio];}return[Math.max(1,Math.round(w*ratio)),Math.max(1,Math.round(h*ratio))];}
+function dimensions(el){const camera=cameraPose(el),ratio=Math.min(devicePixelRatio||1,2),style=getComputedStyle(el),[w,h]=contentSize(el,style),key=[w,h,el.panX,el.panY,style.objectFit,style.objectPosition,el.orbitFit,el.frameRatio,el.naturalWidth,el.metadata,...(el.metadata?.frame??el.data?.display?.frame??[]),...(el.metadata?.support&&el.orbitFit!=='fixed'?[camera.yaw,camera.pitch]:[])];if(!el.layoutKey||key.some((v,i)=>v!==el.layoutKey[i])){el.layoutKey=key;el.layout=panFrame(frameLayout(el,w,h,style),el.panX,el.panY);el.layoutSignature=[el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy,el.frameRatio];}return[Math.max(1,Math.round(w*ratio)),Math.max(1,Math.round(h*ratio))];}
 function enqueue(el,force=false){
  if(!el.isConnected||!el.visible||!(el.src||el.srcset))return Promise.resolve(false);
  const size=dimensions(el),selected=el.pickSource(true);if(selected===el.failedSource&&!el.url)return Promise.resolve(false);if(selected!==el.url&&selected!==el.failedSource){const loading=el.load();if(!el.data||!el.adaptiveLoad)return loading;}
@@ -698,6 +698,10 @@ export class Img3d extends HTMLElement {
   const previous=this.light?.environment;this.light=normalizeLighting(value);if(previous!==this.light.environment)trimCaches();
   enqueue(this);
  }
+ get panX(){return this.screenPanX??0;}
+ set panX(value){if(!Number.isFinite(value))throw Error('Invalid horizontal pan');this.screenPanX=value;enqueue(this);}
+ get panY(){return this.screenPanY??0;}
+ set panY(value){if(!Number.isFinite(value))throw Error('Invalid vertical pan');this.screenPanY=value;enqueue(this);}
  get groundShadow(){return this.shadowEnabled??false;}
  set groundShadow(value){this.shadowEnabled=!!value;enqueue(this);}
  get src(){return this.getAttribute('src')??'';}

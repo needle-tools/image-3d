@@ -24,6 +24,9 @@ export declare class Img3d extends HTMLElement {
   set lighting(value: {direction?: [number, number, number]; intensity?: number; ambient?: number;lights?:Array<{direction:[number,number,number];color?:[number,number,number];intensity?:number}>;environment?:Img3dEnvironment;environmentIntensity?:number} | null);
   /** Optional cached soft ground footprint; off by default. Not a ray-traced contact shadow. */
   groundShadow: boolean;
+  /** Screen translation in viewport fractions. Positive X moves right, Y down. Defaults to zero. */
+  panX: number;
+  panY: number;
   readonly canvas: HTMLCanvasElement;
   yaw: number;
   pitch: number;

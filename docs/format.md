@@ -407,3 +407,12 @@ The default remains off. Captures without valid support have no footprint.
 This is an approximate soft ground shadow: the convex projected footprint fills
 holes and cannot reproduce separate contact points or self-shadowing. It does
 not change lighting, build surface geometry, or run a shadow render each frame.
+
+
+### Screen panning
+
+`panX` and `panY` translate the rendered view in viewport fractions, defaulting
+to zero. Positive X moves the capture right; positive Y moves it down. These
+properties change the projection without changing distance, orbit, fitted bounds
+or authored metadata. Both backends project ground shadows with the same offset.
+The application owns gesture handling, limits and return animation.

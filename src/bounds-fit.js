@@ -22,3 +22,8 @@ export function boundsFrame(points,{aspect,fov=30,padding=1.1}={}){
 export function orbitEye(view,center=[0,0,0]){
 	return [Math.sin(view.yaw)*Math.cos(view.pitch)*view.distance,Math.sin(view.pitch)*view.distance,Math.cos(view.yaw)*Math.cos(view.pitch)*view.distance].map((value,axis)=>value+center[axis]);
 }
+
+/** Viewport fractions: positive X moves right, positive Y moves down. */
+export function panFrame(layout, x=0, y=0){
+	return {...layout,cx:layout.cx+x*2,cy:layout.cy-y*2};
+}
