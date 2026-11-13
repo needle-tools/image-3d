@@ -25,7 +25,7 @@ export function contentSize(el,style=getComputedStyle(el)){return[Math.max(1,el.
 const position=(value,free)=>{const terms=[...value.replace(/\s/g,'').matchAll(/([+-]?(?:\d*\.)?\d+)(%|px)/g)];return terms.length?terms.reduce((sum,m)=>sum+Number(m[1])*(m[2]==='%'?free/100:1),0):free*.5;};
 /** Keep a stable upright frame; widen it only when another orbit would clip. */
 function orbitFrame(el){
- const display=el.metadata??el.data?.display,[x,y,w,h]=display?.frame??[0,0,1,1],b=display?.support;
+ const display=el.boundsFit??el.metadata??el.data?.display,[x,y,w,h]=display?.frame??[0,0,1,1],b=display?.support;
  if(!b||el.orbitFit!=='auto')return[x,y,w,h];
  const camera=cameraPose(el),yaw=camera.yaw??.55,pitch=camera.pitch??.2,s=Math.sin(yaw),c=Math.cos(yaw),p=Math.sin(pitch),q=Math.cos(pitch),center=[x+w/2,y+h/2];let scale=1;
  for(let i=0;i<b.length;i+=3){

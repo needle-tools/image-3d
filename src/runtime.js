@@ -1,4 +1,5 @@
 import {cameraPose,createCameraMotion} from './camera-motion.js';
+import {boundsFrame,orbitEye} from './bounds-fit.js';
 import {enhanceImage,installNativeImages} from './native-image.js';
 export {enhanceImage};
 import {captureBytes} from './container.js';
@@ -503,8 +504,8 @@ function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
  // Compile cache writes separately so forward PBR does not carry their branch.
  const light=el.lighting,studio=mode!=='baked'&&mode!=='cache'&&enhanced(light),key=studio?'studio'+(light.lights?.length?3:0):['baked','cache','reuse'].includes(mode)?mode:'pbr';
  const {program:p,locations:u}=program(key);
- const camera=cameraPose(el),eye=[Math.sin(camera.yaw)*Math.cos(camera.pitch)*camera.distance,Math.sin(camera.pitch)*camera.distance,Math.cos(camera.yaw)*Math.cos(camera.pitch)*camera.distance];
- const forward=unit(eye.map(x=>-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward);
+ const camera=cameraPose(el),center=el.boundsFit?.center??[0,0,0],eye=orbitEye(camera,center);
+ const forward=unit(eye.map((x,k)=>center[k]-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward);
  gl.useProgram(p);for(const [name,v]of Object.entries({eye,right,up,forward}))gl.uniform3fv(u[name],v);
  if(mode!=='baked'){
   const light=el.lighting;gl.uniform3fv(u.lightDirection,light.direction);gl.uniform1f(u.lightIntensity,light.intensity);gl.uniform1f(u.ambientIntensity,light.ambient);
@@ -527,7 +528,7 @@ function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
 }
 function present(el,asset,{x,y,w,h}){
  viewRenders++;
- const camera=cameraPose(el),eye=[Math.sin(camera.yaw)*Math.cos(camera.pitch)*camera.distance,Math.sin(camera.pitch)*camera.distance,Math.cos(camera.yaw)*Math.cos(camera.pitch)*camera.distance],opaque=[],transparent=[];
+ const camera=cameraPose(el),eye=orbitEye(camera,el.boundsFit?.center),opaque=[],transparent=[];
  for(const batch of asset.batches){if(!batch.blend)opaque.push([batch,0,batch.boxes.length]);else batch.boxes.forEach((box,i)=>transparent.push([batch,i,1,box.c.reduce((s,x,k)=>s+(x-eye[k])**2,0)]));}
  transparent.sort((a,b)=>b[3]-a[3]);
  const cache=surfaceCache(el,asset,w,h,opaque);
@@ -696,7 +697,13 @@ export class Img3d extends HTMLElement {
  set height(value){if(this.getAttribute('height')!==String(value))this.setAttribute('height',String(value));}
  get alt(){return this.getAttribute('alt')??'';}
  set alt(value){if(this.alt!==value)this.setAttribute('alt',value);}
- get frameRatio(){const w=Number(this.getAttribute('width')),h=Number(this.getAttribute('height'));return this.metadata||this.data?this.naturalWidth/this.naturalHeight:w>0&&h>0?w/h:1;}
+ get frameRatio(){if(this.boundsFit)return this.boundsFit.aspect;const w=Number(this.getAttribute('width')),h=Number(this.getAttribute('height'));return this.metadata||this.data?this.naturalWidth/this.naturalHeight:w>0&&h>0?w/h:1;}
+ /** Establish a fixed camera from reconstructed bounds; no fitting runs while orbiting. */
+ fitToBounds({aspect=this.clientWidth/this.clientHeight,fov=30,padding=1.1}={}){
+  this.boundsFit=boundsFrame(this.metadata?.support??this.data?.display?.support,{aspect,fov,padding});
+  this.distance=this.boundsFit.distance;this.layoutKey=null;cameraMotion.stop(this);enqueue(this);
+  return this.distance;
+ }
  syncSizing(){
   for(const name of ['width','height']){const n=Number(this.getAttribute(name)),value=n>0?n+'px':'';if(this.style.getPropertyValue('--img3d-'+name)!==value){if(value)this.style.setProperty('--img3d-'+name,value);else this.style.removeProperty('--img3d-'+name);}}
   const ratio=String(this.frameRatio);if(this.style.getPropertyValue('--img3d-ratio')!==ratio)this.style.setProperty('--img3d-ratio',ratio);
@@ -733,7 +740,7 @@ export class Img3d extends HTMLElement {
  connectedCallback(){elements.add(this);this.syncSizing();resize.observe(this);intersection.observe(this);this.load();}
  disconnectedCallback(){elements.delete(this);resize.unobserve(this);intersection.unobserve(this);this.visible=false;this.release();if(!elements.size)clearCaches();}
  attributeChangedCallback(name){if(!this.isConnected)return;if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
- release(){cameraMotion.stop(this);this.loadingUrl=null;this.metadata=null;this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
+ release(){cameraMotion.stop(this);this.boundsFit=null;this.loadingUrl=null;this.metadata=null;this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
  async load(){
   if(!this.isConnected||!this.visible)return false;
   const url=this.pickSource();
@@ -741,7 +748,7 @@ export class Img3d extends HTMLElement {
   if(!url){this.release();this.url=null;return false;}
   if(this.loadingUrl===url)return this.loadTask;
   if(this.url===url&&gpu.has(url)&&!gpu.get(url).disposed&&!this.abort?.signal.aborted&&!this.reloadSource)return enqueue(this);
-  const adaptive=!!this.data&&!this.reloadSource&&this.url!==url;this.adaptiveLoad=adaptive;this.reloadSource=false;
+  const adaptive=!!this.data&&!this.reloadSource&&this.url!==url;this.adaptiveLoad=adaptive;this.reloadSource=false;if(!adaptive)this.boundsFit=null;
   this.generation++;this.abort?.abort();cancel(this);this.abort=new AbortController();
   let generation=this.generation;this.loadingUrl=url;this.status.textContent=this.data?'':'Loading…';
   return this.loadTask=(async()=>{

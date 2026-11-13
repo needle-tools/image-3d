@@ -260,8 +260,8 @@ function invert(m){
 }
 // The camera every backend shares: orbit eye, then WebGPU's 0..1 clip depth.
 export function camera(el,w,h){
- const view=cameraPose(el),eye=[Math.sin(view.yaw)*Math.cos(view.pitch)*view.distance,Math.sin(view.pitch)*view.distance,Math.cos(view.yaw)*Math.cos(view.pitch)*view.distance];
- const forward=unit(eye.map(x=>-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward),near=.01,far=100,layout=el.layout??{sx:h/w,sy:1,cx:0,cy:0},ratio=el.frameRatio??1;
+ const view=cameraPose(el),center=el.boundsFit?.center??[0,0,0],eye=[Math.sin(view.yaw)*Math.cos(view.pitch)*view.distance,Math.sin(view.pitch)*view.distance,Math.cos(view.yaw)*Math.cos(view.pitch)*view.distance].map((value,axis)=>value+center[axis]);
+ const forward=unit(eye.map((x,k)=>center[k]-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward),near=.01,far=100,layout=el.layout??{sx:h/w,sy:1,cx:0,cy:0},ratio=el.frameRatio??1;
  const rows=[[...right.map(v=>v*FOCAL*layout.sx/ratio),-dot(right,eye)*FOCAL*layout.sx/ratio],[...up.map(v=>v*FOCAL*layout.sy),-dot(up,eye)*FOCAL*layout.sy],[...forward.map(v=>v*far/(far-near)),-dot(forward,eye)*far/(far-near)-far*near/(far-near)],[...forward,-dot(forward,eye)]];
  for(let k=0;k<4;k++){rows[0][k]+=layout.cx*rows[3][k];rows[1][k]+=layout.cy*rows[3][k];}
  const matrix=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++)matrix[c*4+r]=rows[r][c];

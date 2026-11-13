@@ -163,6 +163,13 @@ resident capture; payload bytes exclude driver and raster-canvas overhead.
 Native poster decoding and browser image-cache memory are additional to those
 3D texture payloads and are managed by the browser.
 
+For a fixed camera fitted to the reconstructed surface instead of the authored
+poster crop, call `element.fitToBounds({aspect: 4 / 3, fov: 30, padding: 1.1})`
+after `load`. It returns the fitted camera distance. The orbit center comes from
+the surface bounds, including off-center captures. This is a one-time fit; yaw,
+pitch and distance changes do not refit the frame. Existing poster framing remains
+the default. The capture must contain surface-support metadata.
+
 The optional studio lighting object uses:
 
 ```js

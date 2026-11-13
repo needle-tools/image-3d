@@ -26,6 +26,8 @@ export declare class Img3d extends HTMLElement {
   yaw: number;
   pitch: number;
   distance: number;
+  /** After load, establish fixed padded framing from captured surface bounds. Does not refit during orbit. */
+  fitToBounds(options?: {aspect?:number;fov?:number;padding?:number}): number;
   /** Apply the requested pose immediately, finish camera easing, and allow canvas readback. */
   draw(): Promise<boolean>;
   /** Restore the initial orbit and zoom. */
