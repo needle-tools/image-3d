@@ -36,9 +36,9 @@ test('environment rotation changes only lighting, shares texture storage and res
     const a=await create(),b=await create();
     const pixels=async el=>{await el.draw();return Array.from(readCanvas(el.canvas).data);};
     const before=await pixels(a),other=await pixels(b),bytesBefore=customElements.get('img-3d').statistics.environmentBytes;
-    a.lighting={...a.lighting,environmentRotation:Math.PI/2};
+    a.lighting={...a.lighting,environmentRotation:Math.PI/2,environmentPitch:Math.PI/4};
     const after=await pixels(a),otherAfter=await pixels(b),bytesAfter=customElements.get('img-3d').statistics.environmentBytes;
-    a.lighting={...a.lighting,environmentRotation:0};const restored=await pixels(a);
+    a.lighting={...a.lighting,environmentRotation:0,environmentPitch:0};const restored=await pixels(a);
     return{before,after,other,otherAfter,restored,bytesBefore,bytesAfter,statistics:customElements.get('img-3d').statistics};
    });
    assert(result.before.some((v,i)=>i%4!==3&&Math.abs(v-result.after[i])>10),backend+' environment did not rotate');

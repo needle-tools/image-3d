@@ -412,7 +412,8 @@ not change lighting, build surface geometry, or run a shadow render each frame.
 ### Environment rotation
 
 `lighting.environmentRotation` rotates environment lighting around the world Y
-axis in radians, defaulting to zero. It affects diffuse irradiance and specular
+axis; `lighting.environmentPitch` tilts it about X. Both use radians and default
+to zero. It affects diffuse irradiance and specular
 reflections without changing the model, camera, environment intensity or shared
 texture storage. Negative angles are supported; finite angles wrap to a turn.
 The application owns gesture handling and easing back to its initial rotation.
