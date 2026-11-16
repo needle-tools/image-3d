@@ -414,13 +414,17 @@ async function setup(device,format,features){
     try{
      changed();
      if(bitmap.width!==page.size*(role===0?(page.emission?2:1):3)||bitmap.height!==page.size*(role===2?2:1))throw Error('Invalid img-3d image dimensions');
+     const canvas=new OffscreenCanvas(bitmap.width,bitmap.height),ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,0);
+     const rgba=ctx.getImageData(0,0,bitmap.width,bitmap.height).data;
      if(role===2){
-      const canvas=new OffscreenCanvas(bitmap.width,bitmap.height),ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(bitmap,0,0);
-      const rgba=ctx.getImageData(0,0,bitmap.width,bitmap.height).data,red=new Uint8Array(rgba.length/4);for(let i=0;i<red.length;i++)red[i]=rgba[i*4];
+      const red=new Uint8Array(rgba.length/4);for(let i=0;i<red.length;i++)red[i]=rgba[i*4];
       const t=texture(asset,[bitmap.width,bitmap.height],'r8unorm');device.queue.writeTexture({texture:t},red,{bytesPerRow:bitmap.width},[bitmap.width,bitmap.height]);asset.bytes+=red.length;maps[p][2]=t;
      }else{
-      const t=texture(asset,[bitmap.width,bitmap.height],'rgba8unorm-srgb',GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST|GPUTextureUsage.RENDER_ATTACHMENT);
-      device.queue.copyExternalImageToTexture({source:bitmap},{texture:t,colorSpace:'srgb',premultipliedAlpha:false},[bitmap.width,bitmap.height]);asset.bytes+=bitmap.width*bitmap.height*4;maps[p][0]=t;
+      // Chrome/AMD external-image copies can substitute another bitmap's
+      // pixels even with live sources and a GPU completion fence. Snapshot
+      // owned RGBA bytes once at upload; rendering remains entirely on GPU.
+      const t=texture(asset,[bitmap.width,bitmap.height],'rgba8unorm-srgb');
+      device.queue.writeTexture({texture:t},rgba,{bytesPerRow:bitmap.width*4},[bitmap.width,bitmap.height]);asset.bytes+=rgba.length;maps[p][0]=t;
      }
     }finally{bitmap.close();}
    }

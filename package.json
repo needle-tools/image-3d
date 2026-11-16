@@ -41,7 +41,7 @@
     "convert": "node tools/export.mjs",
     "validate": "node tools/validate.mjs",
     "matrix": "node tools/matrix.mjs",
-    "test": "vitest run tests/converter.test.js && node --test --test-concurrency=1 tests/capture-input.test.mjs tests/thumbnail.test.mjs tests/retina-posters.test.mjs tests/camera-motion.test.mjs tests/browser.test.mjs tests/responsive.test.mjs tests/framing.test.mjs tests/webgpu.test.mjs tests/lighting.test.mjs tests/antialias.test.mjs tests/studio-quality.test.mjs tests/many-elements.test.mjs tests/xuastc.test.mjs tests/surface-search.test.mjs tests/source-quality.test.mjs tests/demo-state.test.mjs tests/demo.test.mjs tests/native-demo.test.mjs",
+    "test": "vitest run tests/converter.test.js && node --test --test-concurrency=1 tests/capture-input.test.mjs tests/thumbnail.test.mjs tests/retina-posters.test.mjs tests/camera-motion.test.mjs tests/browser.test.mjs tests/responsive.test.mjs tests/framing.test.mjs tests/webgpu.test.mjs tests/webgpu-upload.test.mjs tests/lighting.test.mjs tests/antialias.test.mjs tests/studio-quality.test.mjs tests/many-elements.test.mjs tests/xuastc.test.mjs tests/surface-search.test.mjs tests/source-quality.test.mjs tests/demo-state.test.mjs tests/demo.test.mjs tests/native-demo.test.mjs",
     "test:native": "node --test tests/baked.test.mjs",
     "gpu:install": "npm install --no-save webgpu",
     "prepare": "npm run build",
