@@ -47,7 +47,8 @@ export function groundShadow(data) {
 		const signed = inside ? -distance : distance;
 		pixels[y * size + x] = Math.round(255 * .32 / (1 + Math.exp(signed / (spread * .6))));
 	}
-	const shadow = {size, pixels, bounds, floor: min[1]};
+	// Keep the footprint just below coplanar model ground, including flat captures.
+	const shadow = {size, pixels, bounds, floor: min[1] - scale * .001};
 	cache.set(data, shadow);
 	return shadow;
 }
