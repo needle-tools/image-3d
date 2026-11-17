@@ -65,7 +65,8 @@ fn ground(color:vec4f, pixel:vec2f)->vec4f {
  let point=view.eye+ray*((shadow.params.x-view.eye.y)/ray.y);
  let uv=(point.xz-shadow.bounds.xy)/shadow.bounds.zw;
  if(any(uv<vec2f(0))||any(uv>vec2f(1))){return color;}
- let alpha=textureSampleLevel(shadowMap,linearSampler,uv,0).r;
+ var alpha=textureSampleLevel(shadowMap,linearSampler,uv,0).r;
+ if(view.fog.y>view.fog.x){alpha*=1.-smoothstep(view.fog.x,view.fog.y,length(point-view.eye)*view.fog.z)*view.fog.w;}
  return vec4f(color.rgb,color.a+(1.-color.a)*alpha);
 }` : `
 uniform sampler2D shadowMap;

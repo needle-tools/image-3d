@@ -155,3 +155,37 @@ Publishing from `release/canary` updates npm `canary` with a timestamped prerele
 `release/latest` publishes the stable manifest version under `latest`.
 See [publishing setup and package checks](docs/publishing.md) for OIDC configuration and
 local package checks. Neither release branch needs an npm token secret.
+
+
+## Shared-camera scenes (experimental)
+
+`createImg3dScene(canvas, {lighting, signal})` uses the existing runtime WebGPU
+device and capture caches to render several captures directly into one transparent
+canvas. It requires WebGPU; ordinary Image3D elements retain their WebGL fallback.
+
+```js
+const scene = await createImg3dScene(canvas, {signal});
+await scene.load([
+  {src: 'model.i3d', position: [0, 0, 0], yaw: 0, scale: 1},
+  {src: 'other.i3d', position: [3, 0, -4], yaw: .4, scale: 1},
+]);
+await scene.draw({eye: [0, 12, 20], target: [0, 1, -4], fit: true, align: 'bottom',
+  fog: {near: 35, far: 90, opacity: .8}});
+const index = scene.hitTest(canvasX, canvasY);
+if (index >= 0) scene.setYaw(index, .8);
+scene.dispose();
+```
+
+Instances are normalized to a bounding radius of 1.5 times their scale, with the
+capture bounds' base center placed at `position`. Opaque geometry shares one depth
+buffer and camera; blended boxes are sorted in world space. Contact shadows use
+the same scene projection, slightly below the bounds base. Fog softly reduces
+premultiplied opacity so a transparent scene fades into its page background.
+Picking checks projected geometry bounding boxes in destination canvas pixels and
+returns the nearest instance index, or -1. Rotation updates transforms in place
+without reloading textures. `draw()` coalesces camera changes into the runtime's
+next animation frame. Pass a callback instead of a camera object to sample scroll
+or pointer state inside that frame: `scene.draw(() => currentCamera())`. This avoids
+queuing an older perspective while native scrolling continues. Optional
+`align: 'bottom'` places fitted bounds near the bottom of the canvas. Dispose scenes when removed to release their attachments
+and active capture references.

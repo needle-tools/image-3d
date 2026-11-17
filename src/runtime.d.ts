@@ -2,7 +2,7 @@
 export declare class Img3d extends HTMLElement {
   static observedAttributes: string[];
   /** Shared renderer usage. WebGPU is preferred (one device; `contexts` counts WebGL contexts only). Entry/byte limits apply to inactive assets; visible assets stay resident. */
-  static readonly statistics: { backend:'webgpu'|'webgl2'|null; adapter:{vendor:string;architecture:string;description:string;fallback:boolean}|null; devices:number; canvasContexts:number; attachmentBytes:number; environmentBytes:number; validationErrors:number; surfaceCaches:number; surfaceBytes:number; surfaceBuilds:number; surfaceReuses:number; viewRenders:number; contexts:number; assets:number; textureBytes:number; cachedBytes:number; activeAssets:number; inactiveAssets:number; activeTextureBytes:number; inactiveTextureBytes:number; activeCachedBytes:number; inactiveCachedBytes:number; renders:number; decodes:number; pending:number; fetching:number; entries:number; cpuBytes:number; gpuBytes:number };
+  static readonly statistics: { sceneCount:number; sceneRenders:number; backend:'webgpu'|'webgl2'|null; adapter:{vendor:string;architecture:string;description:string;fallback:boolean}|null; devices:number; canvasContexts:number; attachmentBytes:number; environmentBytes:number; validationErrors:number; surfaceCaches:number; surfaceBytes:number; surfaceBuilds:number; surfaceReuses:number; viewRenders:number; contexts:number; assets:number; textureBytes:number; cachedBytes:number; activeAssets:number; inactiveAssets:number; activeTextureBytes:number; inactiveTextureBytes:number; activeCachedBytes:number; inactiveCachedBytes:number; renders:number; decodes:number; pending:number; fetching:number; entries:number; cpuBytes:number; gpuBytes:number };
   /** The single-file capture URL, including data URLs. */
   src: string;
   /** Candidate widths are converter-measured usable frame pixels, not atlas sizes. */
@@ -49,3 +49,15 @@ export declare function registerImg3dDecoder(decoder: {
 
 /** Enhance a native WebP img/picture using currentSrc and the img's data-orbit-fit attribute; disconnect restores the original image. */
 export declare function enhanceImage(target:HTMLImageElement|HTMLPictureElement):{image:HTMLImageElement;element:Img3d;disconnect():void};
+
+export interface Img3dSceneItem {src:string;position:[number,number,number];yaw?:number;scale?:number}
+export interface Img3dSceneCamera {eye:[number,number,number];target:[number,number,number];fov?:number;fit?:boolean;padding?:number;align?:'center'|'bottom';fog?:{near:number;far:number;opacity:number}}
+/** Experimental shared-camera scenes use the runtime's existing WebGPU device. */
+export declare function createImg3dScene(canvas:HTMLCanvasElement,options?:{lighting?:Partial<Img3d['lighting']>;signal?:AbortSignal}):Promise<{
+ load(items:readonly Img3dSceneItem[]):Promise<void>;
+ draw(camera:Img3dSceneCamera|(()=>Img3dSceneCamera)):Promise<boolean>;
+ setYaw(index:number,yaw:number):void;
+ /** Bounding-box hit in destination canvas pixel coordinates; nearest instance wins. */
+ hitTest(x:number,y:number):number;
+ dispose():void;
+}>;

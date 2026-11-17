@@ -43,10 +43,11 @@ export function studioShader(wgsl){
  const light=i=>wgsl?`view.lights[${i}]`:`studioLights[${i}]`;
  const sources=[];
  sources.push(fn(v2,'studioUv',[[v3,'incoming']],[
+  ...(wgsl?[declare(f,'objectC','cos(view.model.x)'),declare(f,'objectS','sin(view.model.x)'),declare(v3,'oriented',`${v3}(objectC*incoming.x+objectS*incoming.z,incoming.y,-objectS*incoming.x+objectC*incoming.z)`)]:[]),
   declare(f,'rotation',`${parameters}.w`),
   declare(f,'c','cos(rotation)'),declare(f,'s','sin(rotation)'),
   declare(f,'pitch',`${light(1)}.w`),declare(f,'cp','cos(pitch)'),declare(f,'sp','sin(pitch)'),
-  declare(v3,'tilted',`${v3}(incoming.x,cp*incoming.y+sp*incoming.z,-sp*incoming.y+cp*incoming.z)`),
+  declare(v3,'tilted',wgsl?`${v3}(oriented.x,cp*oriented.y+sp*oriented.z,-sp*oriented.y+cp*oriented.z)`:`${v3}(incoming.x,cp*incoming.y+sp*incoming.z,-sp*incoming.y+cp*incoming.z)`),
   declare(v3,'n',`${v3}(c*tilted.x-s*tilted.z,tilted.y,s*tilted.x+c*tilted.z)`),
   'n/=abs(n.x)+abs(n.y)+abs(n.z);',
   `if(n.z<0.){n=${v3}((1.-abs(n.yx))*sign(n.xy+${v2}(1e-20)),n.z);}`,

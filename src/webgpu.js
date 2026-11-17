@@ -1,3 +1,4 @@
+import {sceneProjection,instanceCamera,instancePoint,sceneBounds} from './scene-camera.js';
 import {cameraPose} from './camera-motion.js';
 import {enhanced,studioUniforms,studioShader} from './lighting.js';
 import {surfaceCrossingWgsl} from './surface-shader.js';
@@ -9,13 +10,13 @@ import {groundShadow,shadowShader} from './ground-shadow.js';
 // that element's own WebGPU canvas. No 2D canvas work happens per frame.
 // Boxes stay at twelve triangles; captured surfaces are reconstructed in the
 // fragment shader. Depth-range textures accelerate traversal without meshing.
-const FOCAL=2.41421356,FRAME=11,STRIDE=20,SLOT=512,VIEW=336,ATLAS=4096;
+const FOCAL=2.41421356,FRAME=11,STRIDE=20,SLOT=512,VIEW=368,ATLAS=4096;
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],unit=v=>{const n=Math.hypot(...v);return v.map(x=>x/n);};
 const BLOCKS=[[4,4],[5,4],[5,5],[6,5],[6,6],[8,5],[8,6],[8,8],[10,5],[10,6],[10,8],[10,10],[12,10],[12,12]];
 // Texture preparation must leave room for input without changing captured data.
 const yieldTask=()=>globalThis.scheduler?.yield()??new Promise(resolve=>setTimeout(resolve,0));
 const shader=`
-struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f}
+struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f,fog:vec4f,model:vec4f}
 @group(0) @binding(0) var boxes:texture_2d<f32>;
 @group(0) @binding(1) var geometryMap:texture_2d<f32>;
 @group(0) @binding(2) var colorMap:texture_2d<f32>;
@@ -202,7 +203,8 @@ struct Visible{@location(0) id:u32,@builtin(frag_depth) depth:f32}
  cell=2*length(view.eye)/(view.focal*view.area.w);
  let ray=normalize(world-view.eye);
  let c=max(coverage(own),1e-3);
- let alpha=covered*select(1.,min(textureSampleLevel(geometryMap,filtered,vec2f((own.x+1)*.5,own.y),0).r/c,1.),view.blended!=0);
+ var atmosphere=1.;if(view.fog.y>view.fog.x){atmosphere=1.-smoothstep(view.fog.x,view.fog.y,length(world-view.eye)*view.fog.z)*view.fog.w;}
+ let alpha=atmosphere*covered*select(1.,min(textureSampleLevel(geometryMap,filtered,vec2f((own.x+1)*.5,own.y),0).r/c,1.),view.blended!=0);
  if(baked){
   // Six outgoing-radiance captures blend by how closely each faced the viewer.
   var radiance=vec3f(0);var total=0.;
@@ -299,7 +301,7 @@ async function setup(device,format,features){
  const [visible,clear,pbr,baked,pbrBlend,bakedBlend]=await Promise.all([vis,reset,shading(false,false),shading(true,false),shading(false,true),shading(true,true)]),pipelines={visible,clear,pbr,baked,pbrBlend,bakedBlend};
  const [studio,studioBlend,cinematic,cinematicBlend]=await Promise.all([shading(false,false,true),shading(false,true,true),shading(false,false,true,true),shading(false,true,true,true)]);Object.assign(pipelines,{studio,studioBlend,cinematic,cinematicBlend});
  const resolveModule=device.createShaderModule({code:`
- struct View{matrix:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,padding:array<vec4f,3>,area:vec4f}
+ struct View{matrix:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,padding:array<vec4f,3>,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f,fog:vec4f,model:vec4f}
  struct Shadow{bounds:vec4f,params:vec4f}
  @group(0) @binding(2) var shadowMap:texture_2d<f32>;
  @group(0) @binding(3) var<uniform> shadow:Shadow;
@@ -309,9 +311,11 @@ async function setup(device,format,features){
  ${antialiasShader(true)}
  ${shadowShader(true)}
  @vertex fn vs(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(f32(i/2u)*4-1,f32(i%2u)*4-1,0,1);}
- @fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{return ground(resolvePixel(p.xy),p.xy);}`});
+ @fragment fn fs(@builtin(position) p:vec4f)->@location(0) vec4f{return ground(resolvePixel(p.xy),p.xy);}
+ @fragment fn fsGround(@builtin(position) p:vec4f)->@location(0) vec4f{return ground(vec4f(0),p.xy);}`});
  const resolveLayout=device.createBindGroupLayout({entries:[{binding:0,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:1,visibility:GPUShaderStage.FRAGMENT,sampler:{}},{binding:2,visibility:GPUShaderStage.FRAGMENT,texture:{}},{binding:3,visibility:GPUShaderStage.FRAGMENT,buffer:{minBindingSize:32}}]});
  const resolvePipeline=await device.createRenderPipelineAsync({layout:device.createPipelineLayout({bindGroupLayouts:[resolveLayout,viewLayout]}),vertex:{module:resolveModule,entryPoint:'vs'},fragment:{module:resolveModule,entryPoint:'fs',targets:[{format}]}});
+ const groundPipeline=await device.createRenderPipelineAsync({layout:device.createPipelineLayout({bindGroupLayouts:[resolveLayout,viewLayout]}),vertex:{module:resolveModule,entryPoint:'vs'},fragment:{module:resolveModule,entryPoint:'fsGround',targets:[{format,blend:{color:{srcFactor:'one',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}}]}});
  const environments=new Map();
  function studioBinding(light){
   const e=light.environment;let record=environments.get(e);
@@ -324,6 +328,7 @@ async function setup(device,format,features){
  function shadePipeline(item,blend=false){
   const light=item.el.lighting,key=item.asset.data.appearance==='baked'?'baked':enhanced(light)?light.lights?.length?'cinematic':'studio':'pbr';return pipelines[key+(blend?'Blend':'')];
  }
+ const sceneTargets=new Set();
  const targets=new Map(),pool=[],elementIds=new WeakMap();let tick=0,serial=0,retained=null;
  // Each translucent box retains its visibility for light-only updates.
  // Offscreen owners release it; inactive sizes expire after frame submission.
@@ -336,7 +341,7 @@ async function setup(device,format,features){
  }
  function evict(){for(const [key,t]of targets)if(tick-t.used>60||targets.size>16&&t.used<tick-1){for(const x of t.textures)x.destroy();targets.delete(key);}}
  function trimEnvironments(active){for(const [e,r]of environments)if(!active.has(e)){r.texture.destroy();environments.delete(e);}}
- function release(){for(const e of environments.values())e.texture.destroy();environments.clear();retained=null;for(const t of atlas?.textures??[])t.destroy();atlas=null;for(const t of targets.values())for(const x of t.textures)x.destroy();targets.clear();for(const p of pool)p.buffer.destroy();pool.length=0;}
+ function release(){for(const record of [...sceneTargets])forgetScene(record);for(const e of environments.values())e.texture.destroy();environments.clear();retained=null;for(const t of atlas?.textures??[])t.destroy();atlas=null;for(const t of targets.values())for(const x of t.textures)x.destroy();targets.clear();for(const p of pool)p.buffer.destroy();pool.length=0;}
  function forget(el){
   retained?.entries.delete(el);const owner=elementIds.get(el);
   for(const [key,t]of targets)if(t.owner===owner){for(const x of t.textures)x.destroy();targets.delete(key);}
@@ -452,7 +457,7 @@ async function setup(device,format,features){
  const SEGMENT=256;
  function slot(frame,view,el,batch,page,clip,target=[0,0,1,1],source=[0,0,0,0]){
   const data=new ArrayBuffer(VIEW),f=new Float32Array(data),i=new Int32Array(data),u=new Uint32Array(data),light=el.lighting;
-  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f[35]=view.focal;f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index;u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);
+  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f[35]=view.focal;f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index+(el.sceneBatchOffset??0);u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);if(el.sceneFog)f.set(el.sceneFog,84);f[88]=el.sceneYaw??0;
   let segment=frame.segments.at(-1);
   if(!segment||segment.slots.length===SEGMENT){
    const k=frame.segments.length;if(!pool[k]){const buffer=device.createBuffer({size:SLOT*SEGMENT,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});pool[k]={buffer,group:device.createBindGroup({layout:viewLayout,entries:[{binding:0,resource:{buffer,size:VIEW}}]})};}
@@ -567,6 +572,73 @@ async function setup(device,format,features){
   for(const {buffer,slots}of frame.segments){const all=new Uint8Array(slots.length*SLOT);slots.forEach((s,i)=>all.set(new Uint8Array(s),i*SLOT));device.queue.writeBuffer(buffer,0,all);}
   device.queue.submit([encoder.finish()]);tick++;evict();
  }
- return{device,format,features,maxTexture:device.limits.maxTextureDimension2D,upload,destroy,frame,present,submit,release,forget,trimEnvironments,
-  get environmentBytes(){return [...environments.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0);},get attachmentBytes(){return[...targets.values()].reduce((sum,t)=>sum+t.bytes,0)+(atlas?.bytes??0);},get validationErrors(){return validationErrors;}};
+ function shadowRecord(asset,shadow){
+  const key=shadow?'groundResolve':'plainResolve';let record=asset[key];
+  if(!record){
+   const mask=texture(asset,[shadow?.size??1,shadow?.size??1],'r8unorm');
+   device.queue.writeTexture({texture:mask},shadow?.pixels??new Uint8Array(1),{bytesPerRow:shadow?.size??1},[shadow?.size??1,shadow?.size??1]);
+   const buffer=device.createBuffer({size:32,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST}),values=new Float32Array(8);
+   values.set(shadow?.bounds??[0,0,1,1]);values[4]=shadow?.floor??0;values[5]=shadow?1:0;device.queue.writeBuffer(buffer,0,values);
+   record={mask,buffer};asset[key]=record;asset.bytes+=shadow?.pixels.length??1;
+  }
+  return record;
+ }
+ function resolveGroup(image,record){return device.createBindGroup({layout:resolveLayout,entries:[{binding:0,resource:image.createView()},{binding:1,resource:sampler},{binding:2,resource:record.mask.createView()},{binding:3,resource:{buffer:record.buffer}}]});}
+ function forgetScene(record){for(const t of record.textures??[])t.destroy();record.context?.unconfigure();record.textures=[];sceneTargets.delete(record);}
+ function sceneTarget(record,canvas,w,h){
+  if(record.device!==device){record.context=canvas.getContext('webgpu');if(!record.context)throw Error('Scene requires a WebGPU canvas');record.context.configure({device,format,alphaMode:'premultiplied'});record.device=device;sceneTargets.add(record);}
+  if(record.width!==w||record.height!==h){
+   for(const t of record.textures??[])t.destroy();record.textures=[];record.layer=null;
+   const make=format=>{const t=device.createTexture({size:[w,h],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});record.textures.push(t);return t;};
+   record.color=make(format);record.id=make('r32uint');record.depth=make('depth32float');record.read=aux(record.id,record.depth);record.clip=aux(none[0],record.depth);record.width=w;record.height=h;record.bytes=w*h*12;
+  }
+  return record;
+ }
+ function sceneScissor(item,w,h){
+  const points=item.instance.corners.map(p=>instancePoint({model:item.instance.inverse},p));
+  const shadow=groundShadow(item.asset.data);
+  if(shadow){const [x,z,sw,sh]=shadow.bounds;for(const px of [x,x+sw])for(const pz of [z,z+sh])points.push([px,shadow.floor,pz]);}
+  const projected=points.map(point=>{const p=[...point,1],m=item.view.matrix,clip=[0,1,3].map(row=>p.reduce((sum,v,col)=>sum+v*m[col*4+row],0));return[(clip[0]/clip[2]+1)*w/2,(1-clip[1]/clip[2])*h/2];});
+  const x=Math.max(0,Math.floor(Math.min(...projected.map(p=>p[0])))-2),y=Math.max(0,Math.floor(Math.min(...projected.map(p=>p[1])))-2);
+  return[x,y,Math.max(0,Math.min(w,Math.ceil(Math.max(...projected.map(p=>p[0])))+2)-x),Math.max(0,Math.min(h,Math.ceil(Math.max(...projected.map(p=>p[1])))+2)-y)];
+ }
+ function renderScene(record,canvas,instances,settings,lighting){
+  const w=canvas.width,h=canvas.height,a=sceneTarget(record,canvas,w,h),shared=sceneProjection(settings,w,h,instances.map(i=>i.instance)),f=frame(),encoder=f.encoder;
+  let batchOffset=0;
+  const items=instances.map(({asset,instance},index)=>{
+   const c=Math.cos(instance.yaw),s=Math.sin(instance.yaw),rotate=v=>[c*v[0]-s*v[2],v[1],s*v[0]+c*v[2]];
+   const localLighting={...lighting,direction:rotate(lighting.direction),...(lighting.lights?{lights:lighting.lights.map(light=>({...light,direction:rotate(light.direction)}))}:{}),environmentRotation:lighting.environmentRotation??0};
+   const fog=settings.fog;
+   if(fog&&(!Number.isFinite(fog.near)||!Number.isFinite(fog.far)||fog.far<=fog.near||!(fog.opacity>=0&&fog.opacity<=1)))throw Error('Invalid scene fog');
+   const el={lighting:localLighting,groundShadow:true,sceneBatchOffset:batchOffset,sceneYaw:instance.yaw,sceneFog:fog?[fog.near,fog.far,instance.scale,fog.opacity]:null};batchOffset+=asset.batches.length;
+   if(batchOffset>4096)throw Error('Too many scene batches');
+   const item={index,asset,instance,el,view:instanceCamera(shared,instance),w,h,rect:[0,0,w,h]};item.scissor=sceneScissor(item,w,h);return item;
+  }).filter(item=>item.scissor[2]&&item.scissor[3]);
+  const region=(pass,item)=>{pass.setViewport(0,0,w,h,0,1);pass.setScissorRect(...item.scissor);};
+  let pass=encoder.beginRenderPass({colorAttachments:[{view:a.color.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});
+  pass.setPipeline(groundPipeline);
+  for(const item of items){const shadow=groundShadow(item.asset.data);if(!shadow)continue;const r=shadowRecord(item.asset,shadow);r.sceneGroundGroup??=resolveGroup(blank,r);region(pass,item);pass.setBindGroup(0,r.sceneGroundGroup);const b=item.asset.batches[0],[uniforms,offset]=slot(f,item.view,item.el,b,item.asset.data.pages[b.page],0,item.rect);pass.setBindGroup(1,uniforms,[offset]);pass.draw(3);}pass.end();
+  pass=encoder.beginRenderPass({colorAttachments:[{view:a.id.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:a.depth.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});
+  pass.setPipeline(pipelines.visible);pass.setBindGroup(2,unbound);
+  for(const item of items){region(pass,item);carriers(f,pass,item,item.asset.batches.filter(b=>!b.blend).map(b=>[b,0,b.boxes.length]),0);}pass.end();
+  pass=encoder.beginRenderPass({colorAttachments:[{view:a.color.createView(),loadOp:'load',storeOp:'store'}]});pass.setBindGroup(2,a.read);
+  for(const item of items){region(pass,item);pass.setPipeline(shadePipeline(item));screen(f,pass,item,item.asset.batches.filter(b=>!b.blend),item.rect,[0,0,0,0]);}pass.end();
+  const transparent=[];
+  for(const item of items)for(const batch of item.asset.batches)if(batch.blend)batch.boxes.forEach((box,index)=>{const center=instancePoint(item.instance,box.c);transparent.push({item,batch,index,distance:center.reduce((sum,v,i)=>sum+(v-shared.eye[i])**2,0)});});
+  transparent.sort((a,b)=>b.distance-a.distance);
+  for(const {item,batch,index}of transparent){
+   if(!a.layer){const id=device.createTexture({size:[w,h],format:'r32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}),depth=device.createTexture({size:[w,h],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});a.textures.push(id,depth);a.bytes+=w*h*8;a.layer={id,depth,read:aux(id,depth)};}
+   const layer=a.layer;
+   pass=encoder.beginRenderPass({colorAttachments:[{view:layer.id.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:layer.depth.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});region(pass,item);pass.setPipeline(pipelines.visible);pass.setBindGroup(2,a.clip);carriers(f,pass,item,[[batch,index,1]],1,[0,0,0,0]);pass.end();
+   pass=encoder.beginRenderPass({colorAttachments:[{view:a.color.createView(),loadOp:'load',storeOp:'store'}]});region(pass,item);pass.setPipeline(shadePipeline(item,true));pass.setBindGroup(2,layer.read);screen(f,pass,item,[batch],item.rect,[0,0,0,0]);pass.end();
+  }
+  const output=record.context.getCurrentTexture();
+  pass=encoder.beginRenderPass({colorAttachments:[{view:output.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});
+  if(items.length){const item=items[0],r=shadowRecord(item.asset,null);pass.setPipeline(resolvePipeline);pass.setBindGroup(0,resolveGroup(a.color,r));const b=item.asset.batches[0],[uniforms,offset]=slot(f,item.view,item.el,b,item.asset.data.pages[b.page],0,[0,0,w,h]);pass.setBindGroup(1,uniforms,[offset]);pass.draw(3);}pass.end();
+  for(const {buffer,slots}of f.segments){const all=new Uint8Array(slots.length*SLOT);slots.forEach((s,i)=>all.set(new Uint8Array(s),i*SLOT));device.queue.writeBuffer(buffer,0,all);}
+  device.queue.submit([encoder.finish()]);tick++;evict();
+  return items.map(item=>({...sceneBounds(shared,item.instance,w,h),index:item.index}));
+ }
+ return{device,format,features,maxTexture:device.limits.maxTextureDimension2D,upload,destroy,frame,present,submit,release,forget,trimEnvironments,renderScene,forgetScene,
+  get sceneContexts(){return sceneTargets.size;},get environmentBytes(){return [...environments.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0);},get attachmentBytes(){return[...targets.values()].reduce((sum,t)=>sum+t.bytes,0)+(atlas?.bytes??0)+[...sceneTargets].reduce((sum,t)=>sum+(t.bytes??0),0);},get validationErrors(){return validationErrors;}};
 }

@@ -1,3 +1,4 @@
+import {sceneInstance,sceneHitTest} from './scene-camera.js';
 import {cameraPose,createCameraMotion} from './camera-motion.js';
 import {boundsFrame,orbitEye} from './bounds-fit.js';
 import {enhanceImage,installNativeImages} from './native-image.js';
@@ -276,19 +277,20 @@ const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
 /** Optional trusted XUASTC entry; capture files never supply executable code. */
 export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
 const cameraMotion=createCameraMotion(el=>enqueue(el));
+const scenes=new Set();
 const elements=new Set(),pending=new Map(),cpu=new Map(),gpu=new Map(),uploads=new Map(),programs=new Map(),lastRendered=new WeakMap();
 const limits={entries:8,cpuBytes:32*1024*1024,gpuBytes:64*1024*1024};
-let surface,gl,depthBits,resolveTexture,canCache=false,epoch=0,running=false,renders=0,contexts=0,decodes=0,surfaceBuilds=0,surfaceReuses=0,viewRenders=0;
+let surface,gl,depthBits,resolveTexture,canCache=false,epoch=0,running=false,renders=0,contexts=0,decodes=0,surfaceBuilds=0,surfaceReuses=0,viewRenders=0,sceneRenders=0;
 const bytes=cache=>[...cache.values()].reduce((sum,r)=>sum+(r.bytes||0),0);
 const touch=(cache,key,value)=>{cache.delete(key);cache.set(key,value);return value;};
 const dispose=r=>{if(r.api)r.api.destroy(r);else for(const t of r.textures)gl?.deleteTexture(t);};
-const activeUrls=()=>new Set([...elements].filter(el=>el.visible&&(el.url||el.loadingUrl)&&!el.abort?.signal.aborted).flatMap(el=>[el.url,el.loadingUrl].filter(Boolean)));
+const activeUrls=()=>new Set([...scenes].flatMap(scene=>[...scene.urls]).concat([...elements].filter(el=>el.visible&&(el.url||el.loadingUrl)&&!el.abort?.signal.aborted).flatMap(el=>[el.url,el.loadingUrl].filter(Boolean))));
 const inactive=(cache,active)=>new Map([...cache].filter(([url,r])=>!active.has(url)&&!r.waiters?.size));
 function trim(cache,budget,active=activeUrls()){
  const idle=inactive(cache,active);let count=idle.size,total=bytes(idle);
  for(const [key,r]of idle){if(count<=limits.entries&&total<=budget)break;cache.delete(key);count--;total-=r.bytes||0;if(cache===gpu)dispose(r);}
 }
-function trimCaches(){const active=activeUrls();trim(cpu,limits.cpuBytes,active);trim(gpu,limits.gpuBytes,active);const environments=new Set([undefined,...[...elements].filter(el=>el.visible&&el.data?.appearance!=='baked').map(el=>el.lighting.environment)]);for(const [e,t]of studioTextures)if(!environments.has(e)){gl?.deleteTexture(t);studioTextures.delete(e);}api?.trimEnvironments(environments);}
+function trimCaches(){const active=activeUrls();trim(cpu,limits.cpuBytes,active);trim(gpu,limits.gpuBytes,active);const environments=new Set([undefined,...[...elements].filter(el=>el.visible&&el.data?.appearance!=='baked').map(el=>el.lighting.environment)]);for(const [e,t]of studioTextures)if(!environments.has(e)){gl?.deleteTexture(t);studioTextures.delete(e);}for(const scene of scenes)if(scene.lighting.environment)environments.add(scene.lighting.environment);api?.trimEnvironments(environments);}
 function cacheCapabilities(){
  depthBits=gl.getParameter(gl.DEPTH_BITS);
  // Cache ownership must preserve the destination's depth ties.
@@ -683,12 +685,63 @@ const resize=new ResizeObserver(entries=>{for(const {target}of entries)target.lo
 document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const el of elements)cameraMotion.stop(el);}else{for(const el of elements)enqueue(el);pump();}});
 addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
 
+/** One shared-camera, shared-depth WebGPU scene, using the existing device and capture caches. */
+export async function createImg3dScene(canvas,{lighting,signal}={}){
+ const chosen=await backend();if(!chosen)throw Error('Image3D scenes require WebGPU');
+ signal?.throwIfAborted();
+ const abort=new AbortController(),record={urls:new Set(),lighting:normalizeLighting(lighting)},target={};
+ scenes.add(record);
+ let owner=chosen;
+ let disposed=false,instances=[],placements=[],loadAbort,pendingDraw=null,drawFrame=0,resolveDraw,lastSettings,hitBoxes=[];
+ async function load(items){
+  if(disposed)throw new DOMException('Scene disposed','AbortError');
+  loadAbort?.abort();const loading=loadAbort=new AbortController(),combined=AbortSignal.any([abort.signal,loading.signal]);
+  const next=items.map(item=>({...item,src:new URL(item.src,document.baseURI).href}));
+  const oldUrls=record.urls;record.urls=new Set([...oldUrls,...next.map(item=>item.src)]);
+  try{
+   const assets=await Promise.all(next.map(item=>resource(item.src,combined)));combined.throwIfAborted();
+   instances=assets.map((asset,index)=>({asset,instance:sceneInstance(asset.data,next[index])}));placements=next;record.urls=new Set(next.map(item=>item.src));trimCaches();
+  }catch(error){if(loadAbort===loading){record.urls=oldUrls;trimCaches();}throw error;}
+ }
+ async function draw(settings){
+  if(disposed||document.hidden)return false;lastSettings=settings;
+  const backendApi=await backend();if(!backendApi)throw Error('Image3D scenes require WebGPU');
+  if(instances.some(item=>item.asset.disposed||item.asset.api!==backendApi))await load(placements);
+  if(disposed)return false;
+  if(owner!==backendApi){owner.forgetScene(target);target.device=null;owner=backendApi;}
+  if(pendingDraw)return pendingDraw;
+  pendingDraw=new Promise((resolve,reject)=>{
+   resolveDraw=resolve;
+   drawFrame=requestAnimationFrame(()=>{
+    drawFrame=0;
+    try{
+     if(disposed||document.hidden){resolve(false);return;}
+     const settings=typeof lastSettings==='function'?lastSettings():lastSettings;
+     hitBoxes=backendApi.renderScene(target,canvas,instances,settings,record.lighting);renders++;viewRenders++;sceneRenders++;resolve(true);
+    }catch(error){reject(error);}
+    finally{pendingDraw=null;resolveDraw=null;}
+   });
+  });
+  return pendingDraw;
+ }
+ function dispose(){
+  if(disposed)return;disposed=true;abort.abort();cancelAnimationFrame(drawFrame);resolveDraw?.(false);pendingDraw=null;resolveDraw=null;
+  owner.forgetScene(target);scenes.delete(record);signal?.removeEventListener('abort',dispose);trimCaches();
+ }
+ signal?.addEventListener('abort',dispose,{once:true});
+ function setYaw(index,yaw){
+  if(disposed)return;
+  if(!instances[index]||!Number.isFinite(yaw))throw Error('Invalid scene instance rotation');
+  placements[index]={...placements[index],yaw};instances[index].instance=sceneInstance(instances[index].asset.data,placements[index]);
+ }
+ return {load,draw,dispose,setYaw,hitTest:(x,y)=>sceneHitTest(hitBoxes,x,y)};
+}
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {
  static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit'];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
-  return {backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length,attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
+  return {sceneCount:scenes.size,sceneRenders,backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length+(api?.sceneContexts??0),attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
  }
  get textureBytes(){return gpu.get(this.url)?.bytes??0;}
  get textureFormat(){return gpu.get(this.url)?.textureFormat??null;}
