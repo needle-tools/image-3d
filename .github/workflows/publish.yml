@@ -1,0 +1,55 @@
+name: Publish npm package
+
+on:
+  push:
+    branches:
+      - release/canary
+      - release/latest
+
+concurrency:
+  group: publish-npm-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/release/canary' || github.ref == 'refs/heads/release/latest'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - name: Install build dependencies
+        run: npm ci --ignore-scripts
+      - name: Check package guards
+        run: npm run test:release
+      - name: Build browser runtimes
+        run: npm run build
+      - name: Verify npm package contents
+        run: npm run check:package
+      - name: Publish canary
+        if: github.ref == 'refs/heads/release/canary'
+        run: >-
+          npx --yes needle-publish-helper@next publish .
+          --oidc --tag canary
+          --version+tag --version+time --version+hash
+          --create-tag release/
+      - name: Publish latest
+        if: github.ref == 'refs/heads/release/latest'
+        run: >-
+          npx --yes needle-publish-helper@next publish .
+          --oidc --tag latest
+          --create-tag release/

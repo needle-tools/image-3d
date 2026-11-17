@@ -148,3 +148,10 @@ To package an XUASTC capture as WebP, use `node tools/package-image.mjs capture.
 An Image 3D WebP is a regular WebP image. Its image data comes first, allowing the browser to decode and display it while the rest of the file is still downloading. This follows the [WebP container specification's ordering for streaming image data](https://developers.google.com/speed/webp/docs/riff_container#extended_file_format).
 
 The 3D capture is embedded sidecar data in an `I3D1` RIFF chunk after the image, inside the same `.webp` file. The [WebP specification allows application-specific chunks](https://developers.google.com/speed/webp/docs/riff_container#unknown_chunks), which ordinary image readers can ignore. Image 3D reads this extra data to render the interactive view. See the [Image 3D WebP package format](docs/format.md#webp-image-package) for its layout.
+
+## npm release channels
+
+Publishing from `release/canary` updates npm `canary` with a timestamped prerelease;
+`release/latest` publishes the stable manifest version under `latest`.
+See [publishing setup and package checks](docs/publishing.md) for OIDC configuration and
+local package checks. Neither release branch needs an npm token secret.
