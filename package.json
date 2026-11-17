@@ -1,7 +1,7 @@
 {
   "name": "@needle-tools/image-3d",
   "version": "0.1.0",
-  "description": "Dependency-free img-3d custom elements for compact single-file box captures.",
+  "description": "Interactive 3D images in a single WebP, with native image fallback and a dependency-free WebGPU/WebGL runtime.",
   "type": "module",
   "license": "UNLICENSED",
   "engines": {

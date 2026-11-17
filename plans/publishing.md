@@ -24,3 +24,17 @@ remain user-managed prerequisites. No browser/GPU checks run: no renderer edits.
 - Review simplification: removed the unrequested workflow_dispatch/dry_run mode
   and conditional argument expression; both helper commands now explicitly pass
   --create-tag release/. Local package validation remains available.
+
+
+## Package description and README - READY FOR REVIEW
+
+- `package.json`: describes interactive single-WebP images, native image fallback
+  and the dependency-free WebGPU/WebGL runtime, matching the current README.
+- `README.md`: removed release-channel and shared-camera scene sections; made
+  Needle Cloud the first capture generation/hosting option; labeled repo-only
+  conversion commands as local; linked the NEEDLE_box_impostor code label to
+  https://needle.click/mesh-baker; added the standard Needle contact footer.
+- `LICENSES/README.md`: removed the stale claim that publication is disabled;
+  third-party notices and the package license are unchanged.
+- Documentation/metadata-only edits; reviewed the diff and parsed package JSON.
+  No renderer changes, builds, publishing, push or commit performed for this edit.

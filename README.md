@@ -87,7 +87,16 @@ See the [runtime API and capture format](docs/format.md) for lighting, responsiv
 
 ## Create a capture
 
-The converter takes a GLB containing `NEEDLE_box_impostor` capture data, with uncompressed PNG capture maps. Animated inputs must be frozen first. It does not convert an ordinary mesh or photograph into a 3D capture.
+Create and host Image 3D captures with [Needle Cloud](https://cloud.needle.tools).
+Upload your 3D asset, generate an Image3D variant, and use its WebP URL in your
+`<img data-img-3d>` element. Cloud handles capture generation and hosting.
+
+### Local conversion
+
+The following commands run from a checkout of this repository with its development
+dependencies installed.
+
+The converter takes a GLB containing [`NEEDLE_box_impostor`](https://needle.click/mesh-baker) capture data, with uncompressed PNG capture maps. Animated inputs must be frozen first. It does not convert an ordinary mesh or photograph into a 3D capture.
 
 ```sh
 npm run convert -- capture.glb output --webp
@@ -149,43 +158,8 @@ An Image 3D WebP is a regular WebP image. Its image data comes first, allowing t
 
 The 3D capture is embedded sidecar data in an `I3D1` RIFF chunk after the image, inside the same `.webp` file. The [WebP specification allows application-specific chunks](https://developers.google.com/speed/webp/docs/riff_container#unknown_chunks), which ordinary image readers can ignore. Image 3D reads this extra data to render the interactive view. See the [Image 3D WebP package format](docs/format.md#webp-image-package) for its layout.
 
-## npm release channels
+## Contact
 
-Publishing from `release/canary` updates npm `canary` with a timestamped prerelease;
-`release/latest` publishes the stable manifest version under `latest`.
-See [publishing setup and package checks](docs/publishing.md) for OIDC configuration and
-local package checks. Neither release branch needs an npm token secret.
+Questions or feedback? Email [hi@needle.tools](mailto:hi@needle.tools).
 
-
-## Shared-camera scenes (experimental)
-
-`createImg3dScene(canvas, {lighting, signal})` uses the existing runtime WebGPU
-device and capture caches to render several captures directly into one transparent
-canvas. It requires WebGPU; ordinary Image3D elements retain their WebGL fallback.
-
-```js
-const scene = await createImg3dScene(canvas, {signal});
-await scene.load([
-  {src: 'model.i3d', position: [0, 0, 0], yaw: 0, scale: 1},
-  {src: 'other.i3d', position: [3, 0, -4], yaw: .4, scale: 1},
-]);
-await scene.draw({eye: [0, 12, 20], target: [0, 1, -4], fit: true, align: 'bottom',
-  fog: {near: 35, far: 90, opacity: .8}});
-const index = scene.hitTest(canvasX, canvasY);
-if (index >= 0) scene.setYaw(index, .8);
-scene.dispose();
-```
-
-Instances are normalized to a bounding radius of 1.5 times their scale, with the
-capture bounds' base center placed at `position`. Opaque geometry shares one depth
-buffer and camera; blended boxes are sorted in world space. Contact shadows use
-the same scene projection, slightly below the bounds base. Fog softly reduces
-premultiplied opacity so a transparent scene fades into its page background.
-Picking checks projected geometry bounding boxes in destination canvas pixels and
-returns the nearest instance index, or -1. Rotation updates transforms in place
-without reloading textures. `draw()` coalesces camera changes into the runtime's
-next animation frame. Pass a callback instead of a camera object to sample scroll
-or pointer state inside that frame: `scene.draw(() => currentCamera())`. This avoids
-queuing an older perspective while native scrolling continues. Optional
-`align: 'bottom'` places fitted bounds near the bottom of the canvas. Dispose scenes when removed to release their attachments
-and active capture references.
+[Needle](https://needle.tools) | [GitHub](https://github.com/needle-tools) | [Discord](https://discord.needle.tools) | [Forum](https://forum.needle.tools)

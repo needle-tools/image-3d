@@ -1,6 +1,6 @@
 # Notices
 
-This repository is private. Package publication is disabled.
+Third-party notices for the Image 3D runtime.
 
 The standalone runtime and surface-search code were extracted from Needle's
 Mesh Effects project and retain its [MIT notice](mesh-effects-MIT.txt).
