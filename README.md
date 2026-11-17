@@ -1,274 +1,150 @@
 # Image 3D
 
-A dependency-free `<img-3d>` custom element for compact, single-file 3D captures.
-WebGPU is preferred, with a WebGL fallback. Many elements share one renderer;
-scrolling, clipping and stacking remain native browser behavior.
+Display an interactive 3D capture with a regular HTML image and one JavaScript file. The browser runtime has no dependencies and uses WebGPU or WebGL 2.
 
-The runtime, converter, format and comparison page live here. This repository
-has no dependency on Baker or Mesh Effects. A producer exports a
-`NEEDLE_box_impostor` GLB; the converter packs its captures into `.i3d` or a WebP
-with a native poster and embedded capture. Producers can also write the documented format directly.
+## Quick start: use an `<img>`
 
-## Run the comparison
-
-Node 22+, npm and Chrome are needed for development and browser checks.
-
-```sh
-npm ci
-npm run dev
-```
-
-Open the printed URL, normally `http://localhost:4200/`. The repository includes
-the five-model demo at 512 and 1024, live/baked lighting, native/XUASTC variants,
-32-view WebP comparisons and source references. No producer checkout or source
-asset download is needed to run it. Generated runtime bundles are copied into
-the demo when starting it.
-
-**Reference** compares the 3D capture with the existing **32 WebP views** at the
-selected resolution. Drag either pane horizontally, or use its arrow keys, to
-rotate both views at matching cameras and a fixed elevation. Selecting **32 WebP
-views** under Appearance shows that same turntable on its own.
-
-**Auto** resolution selects between the 512 and 1024 captures using measured
-usable resolution, element size, pixel density and zoom. **Native image** uses
-the WebP poster and native image enhancement for the single view. Both paths use
-the same renderer. Measurements includes the converter's **Usable width**.
-
-The address follows the demo settings and camera, so copying it reproduces the
-view. For example, `?model=watch&resolution=1024&appearance=pbr&light=1` opens
-the watch with moving lights. `native`, `grid`, `reference`, `follow` and `measurements`
-accept `1` or `0`; `size` sets the grid item width, and `yaw`, `pitch` and
-`distance` set the camera. Default values are omitted. Browser Back and Forward
-restore control changes. Grid cursor-following and temporary drag gestures
-remain local to the page.
-Use `resolution=auto&native=1` to share an automatically selected native image.
-
-**Live light** uses a compact capture of the same RoomEnvironment PMREM and ACES
-tone mapping as **Baked studio**. **Move light** adds three fast, saturated red,
-blue and magenta lights orbiting the product; turning it off restores the studio environment.
-The environment is shared across elements (about 35 KB compressed, 72 KB on the
-GPU). Six-view baked reflections remain an approximation of live reflections.
-
-`demo/public/` has one folder per model, resolution and representation:
-
-```text
-owl-512-i3d/
-  live.i3d
-  live-xuastc.i3d
-  baked.i3d
-  baked-xuastc.i3d
-  live.webp
-  live-xuastc.webp
-  baked.webp
-  baked-xuastc.webp
-owl-512-32views/
-  model.json
-  view-0.webp
-  …
-owl-1024-i3d/
-owl-1024-32views/
-watch-512-i3d/
-watch-512-32views/
-…
-runtime/
-```
-
-The same layout applies to all five models at both resolutions. Folders ending
-in `-32views` hold source-rendered WebP turntables; `runtime/` contains generated JavaScript.
-Full-quality PNGs and lossless captures live in `tests/fixtures/quality/` for
-automated quality checks and are excluded from the deployed demo.
-Browser-test screenshots stay under `.local/test-results/demo/`.
-
-The demo uses the [Needle Brand System](https://brand.needle.tools/) dark palette
-and a local Nunito Sans Latin variable font from
-[Google Fonts](https://fonts.google.com/specimen/Nunito+Sans), licensed under
-[SIL OFL 1.1](demo/fonts/OFL.txt).
-
-## Use the runtime
-
-After building, load one JavaScript file:
+Place `img-3d.js` and your capture on your website, then add `data-img-3d` to the image:
 
 ```html
-<script type="module" src="./dist/img-3d.js"></script>
-<img-3d src="model.i3d" style="width:300px;height:300px"></img-3d>
+<script type="module" src="./img-3d.js"></script>
+<img data-img-3d src="./model.webp" alt="Product">
 ```
 
-The optional `dist/img-3d-xuastc.js` entry includes the decoder and WASM in the
-same file. The package exports are `@needle-tools/image-3d` and
-`@needle-tools/image-3d/xuastc`. The package and repository are private for now;
-no npm publication is required to use the built files.
+The WebP contains both a normal image and the 3D capture. The browser displays the image first; the script adds drag-to-rotate interaction when the capture is ready. Without JavaScript, the image still displays normally. Printing also uses the image.
 
-Both backends keep twelve triangles per box. Surface reconstruction stays in
-the shader. There are no generated surface meshes or geometry LODs. Automatic
-updates compare source, camera, size and lighting state; unchanged views stay
-idle. Explicit `draw()` refreshes the canvas for immediate pixel readback.
-Drag rotation eases briefly into place. On first load, the displayed camera starts
-at the poster pose and reaches a preconfigured orbit in about 0.3 seconds.
-Reduced-motion preferences skip these transitions; `draw()` immediately applies
-the requested pose. Settled and offscreen elements do not keep animating.
+Use a WebP packaged for Image 3D, such as the included [owl capture](demo/public/owl-512-i3d/live.webp), or [create a capture](#create-a-capture). Regular image resizing and re-encoding can remove the embedded 3D data, so serve the packaged file unchanged.
 
-Responsive sources use converter-measured frame widths, not atlas sides:
+## Size it like an image
+
+Use the usual image attributes and CSS. `width` and `height` reserve space while the image loads; `max-width` and `height: auto` make it fit smaller screens.
 
 ```html
-<style>img-3d{display:inline-block;width:100%;max-width:400px;aspect-ratio:116/218}</style>
-<img-3d src="owl-512.i3d"
-  srcset="owl-512.i3d 464w, owl-1024.i3d 956w"
-  width="464" height="872" alt="Owl" style="height:auto"></img-3d>
+<img data-img-3d src="./model.webp" alt="Product"
+  width="400" height="400"
+  style="max-width:100%;height:auto">
 ```
 
-The critical style reserves space before JavaScript runs. Both elements accept
-`data-orbit-fit="fixed"` to keep the captured scale and center while rotating:
+Set `width` and `height` to the actual dimensions of your WebP. No special layout CSS is required for the 3D view. The runtime keeps it aligned with the image.
+
+Native `srcset`, `sizes` and `<picture>` work too. For example, using the two included owl captures:
 
 ```html
-<img data-img-3d data-orbit-fit="fixed" src="model.webp" alt="Model">
-<img-3d data-orbit-fit="fixed" src="model.webp"></img-3d>
+<img data-img-3d src="./demo/public/owl-512-i3d/live.webp" alt="Owl"
+  srcset="./demo/public/owl-512-i3d/live.webp 464w,
+          ./demo/public/owl-1024-i3d/live.webp 956w"
+  sizes="(max-width:400px) 100vw, 400px"
+  width="464" height="872"
+  style="width:100%;max-width:400px;height:auto">
 ```
 
-Fixed framing is the default, and the demo's **Fixed framing** toggle starts on.
-Set `data-orbit-fit="auto"` to widen the frame when rotating would otherwise clip.
-Removing the attribute restores fixed framing. `element.orbitFit = 'fixed'` reflects the same data attribute on
-`<img-3d>`; the earlier `orbit-fit` spelling remains supported on that element, with the data
-attribute taking precedence.
-Fixed framing can clip wider views unless the capture has sufficient margin.
+The browser chooses the file, and the 3D view uses that same file. The `w` values are the WebPs' actual pixel widths; the packaging tool prints them for you.
 
-The component supports
-`object-fit` and `object-position`, preserves its current view while loading a
-responsive upgrade, and keeps camera interaction live during that download.
-Shrinking or zooming out retains a loaded higher-resolution candidate.
-The dimensions above describe newly framed owl captures; use conversion metadata
-for other captures and older files. Conversion prints each capture's display
-metadata. New captures use a measured
-content frame with a small orbit margin, so portrait and landscape objects have
-appropriate intrinsic dimensions. The same frame drives the poster and 3D view;
-extreme orbit angles can widen it to preserve the whole object. Older captures
-retain their recorded framing; packaging them as WebP measures the new frame.
+To enhance a whole `<picture>`, put `data-img-3d` on the `<picture>` instead of its `<img>`.
 
-For native browser image loading, sizing and fallback, use a WebP package:
+## Control the view with JavaScript
+
+You can also enhance an image already on the page:
+
+```html
+<img id="product" src="./model.webp" alt="Product">
+
+<script type="module">
+  import {enhanceImage} from './img-3d.js';
+
+  const preview = enhanceImage(document.querySelector('#product'));
+  preview.element.yaw = 0.8;
+  preview.element.pitch = 0.2;
+  await preview.element.draw();
+</script>
+```
+
+`yaw` and `pitch` are in radians. `distance` controls zoom. Call `draw()` after changing these settings. Call `preview.disconnect()` to restore the plain image. The same API is available when the image was enhanced automatically with `data-img-3d`.
+
+## Use the `<img-3d>` element
+
+For a dedicated 3D element, use `<img-3d>` with a `.i3d` capture or a packaged WebP. Load the same `img-3d.js` script as above.
 
 ```html
 <style>
-picture[data-img-3d]{display:block;position:relative;max-width:400px}
-picture[data-img-3d] img{display:block;width:100%;height:auto}
+  img-3d {
+    display: block;
+    width: 300px;
+    height: 300px;
+  }
 </style>
-<picture data-img-3d>
-  <img src="owl-512.webp" width="464" height="872" alt="Owl"
-    srcset="owl-512.webp 464w, owl-1024.webp 956w"
-    sizes="(max-width:400px) 100vw, 400px">
-</picture>
+
+<img-3d src="./model.i3d" alt="Product"></img-3d>
 ```
 
-The same runtime automatically enhances opted-in pictures and images. The native
-poster remains the layout anchor and works without JavaScript; printing uses
-the poster too. `enhanceImage(imageOrPicture)` provides the same behavior
-programmatically and returns `{image, element, disconnect}`. Its `element` is
-the ordinary `Img3d` API; `disconnect()` restores the native image. Direct image
-enhancement adds a wrapper; an authored picture keeps the layout structure explicit.
-The browser owns source selection: the 3D overlay follows the image's `currentSrc`,
-including its decision to retain a cached higher-resolution candidate. Camera zoom
-does not select another file in this mode.
-The poster comes first in the WebP and can paint before the embedded 3D payload
-arrives; this is verified in Chrome. The overlay waits for the complete package.
-Its fetch reads that same URL through the HTTP cache; cache headers determine
-whether this requires revalidation or another transfer.
+The CSS gives the custom element a size before JavaScript loads, so the page doesn't shift when it appears. This is only needed for the custom element; a regular `<img>` already has native image sizing.
 
-Studio lighting filters subpixel normal detail into the specular roughness and
-resolves silhouette and color edges in a small postprocess. Lighting updates
-reuse captured intersections; anti-aliasing does not retrace the surface.
+Both forms support `object-fit` and `object-position`. Framing stays fixed while rotating by default. Add `data-orbit-fit="auto"` to let the frame expand for wider viewing angles.
 
-## Convert a capture
+Drag or use the arrow keys to rotate, use `+`, `-` or Alt+wheel to zoom, and double-click or press Home to reset. Vertical touch gestures allow page scrolling.
 
-The input must already contain fitted captures in `NEEDLE_box_impostor` version
-1. This tool does not decompose raw meshes. The current converter accepts the
-original, uncompressed PNG capture maps and requires animated inputs to be frozen.
+See the [runtime API and capture format](docs/format.md) for lighting, responsive `.i3d` sources and other options.
+
+## Create a capture
+
+The converter takes a GLB containing `NEEDLE_box_impostor` capture data, with uncompressed PNG capture maps. Animated inputs must be frozen first. It does not convert an ordinary mesh or photograph into a 3D capture.
 
 ```sh
-npm run convert -- capture.glb output
+npm run convert -- capture.glb output --webp
+```
+
+This writes `output/model.i3d` and `output/model.webp`, and prints the image dimensions. WebP poster generation requires Chrome. You can also package an existing `.i3d` file:
+
+```sh
+node tools/package-image.mjs capture.i3d model.webp
+```
+
+Add `--poster image.webp` to provide your own poster. Its camera view, framing and dimensions should match the capture. To check the converted capture:
+
+```sh
 npm run validate -- output --dense
 ```
 
-Conversion measures the finer visible reconstruction detail across the orbit,
-including raster sampling for contours, and writes `display` metadata into
-each capture and its metrics. Add `--webp` to also create `model.webp`, or package
-an existing capture without rebaking or fitting:
+## Try the demo
+
+After installing dependencies, start the demo:
 
 ```sh
-node tools/package-image.mjs capture.i3d capture.webp
+npm run dev
 ```
 
-This renders the poster through the shipped WebGPU viewer and prints the measured
-dimensions and `srcset` descriptor. Use `--xuastc` for a GPU-compressed capture,
-or `--poster image.webp` to supply a poster. Image services must pass the complete
-WebP through: re-encoding can strip the embedded 3D data, leaving a normal poster.
-When the input GLB declares the standard glTF `asset.thumbnail` image, conversion
-preserves it as `source-thumbnail.webp` and uses it for `--webp` packaging when
-it has enough pixels for the measured frame. Smaller thumbnails remain available
-as source data; the poster is rendered from the capture instead of enlarged.
-The full source image is retained in that file. The packaged poster trims
-transparent margins and is resized to the measured 3D frame dimensions, so its
-actual pixel width and the capture's effective detail agree for native `srcset`.
-Generated posters use one render at the calculated dimensions and one quality-85
-WebP encode with lossless alpha. The validation suite checks the fitted raster
-against an equally compressed live view at 2× display density and reports codec
-error separately. Conversion reads compatible glTF 2.1 assets declaring
-`minVersion: "2.0"` as well as ordinary 2.0 input.
+Open the printed URL to rotate the included models and try different lighting and resolutions. Copy the URL to share the selected settings and camera.
 
-The packaged WebP's actual width is its native `srcset` descriptor and equals
-`display.effectiveWidth`. Authored thumbnails can use a different pose or lighting; the standard does not guarantee
-a pixel-identical handoff to the 3D view.
+## Development and reference
 
-Supplied posters should match the reference camera, content frame and dimensions
-in the capture's `display` metadata.
+Run `npm test` for the automated checks. Browser tests require Chrome and run sequentially.
 
-For studio-baked radiance, install Node's optional native WebGPU host first:
+- [Runtime API and capture format](docs/format.md)
+- [Rendering measurements](docs/measurements.md)
+- [Third-party licenses and notices](LICENSES/README.md)
 
-```sh
-npm run gpu:install
-npm run convert -- capture.glb output --baked
+## Optional: XUASTC compression
+
+Captures encoded with XUASTC can use compressed GPU textures. For these files, load `img-3d-xuastc.js` instead of `img-3d.js`:
+
+```html
+<script type="module" src="./img-3d-xuastc.js"></script>
+<img data-img-3d src="./model-xuastc.webp" alt="Product">
 ```
 
-Native codecs use Sharp. Optional XUASTC encoding uses a separately installed
-Basis Universal encoder; the browser runtime needs neither tool:
+The XUASTC entry includes the decoder and WebAssembly in one JavaScript file. The HTML and camera API stay the same.
+
+To encode an existing conversion, install the Basis Universal encoder and pass its executable to the compression tool:
 
 ```sh
 node tools/xuastc.mjs output compressed-output /path/to/basisu
-node tools/validate.mjs compressed-output --dense
+npm run validate -- compressed-output --dense
 ```
 
-`npm run matrix` qualifies the checksum-pinned capture fixtures into
-`.local/matrix/`. It takes `--inputs`, `--models`, `--sizes`, `--profiles` and
-`--basisu`. It consumes captured GLBs and never calls a producer. The committed
-comparison data is independent of this qualification output.
+To package an XUASTC capture as WebP, use `node tools/package-image.mjs capture.i3d model-xuastc.webp --xuastc`.
 
-## Format and checks
+## Technical note: how the WebP file loads
 
-See [the capture format and runtime API](docs/format.md),
-[measured results](docs/measurements.md) and [third-party notices](LICENSES/README.md).
+An Image 3D WebP is a regular WebP image. Its image data comes first, allowing the browser to decode and display it while the rest of the file is still downloading. This follows the [WebP container specification's ordering for streaming image data](https://developers.google.com/speed/webp/docs/riff_container#extended_file_format).
 
-```sh
-npm test
-npm run test:native  # after npm run gpu:install
-```
-
-Browser/GPU tests run sequentially. They retain the existing source-quality
-baselines, scalar shader oracle, transparency, device-loss, scrolling, 120-element
-and independent-lighting regressions. Test fixtures and demo captures are checked
-in; temporary captures, logs and research data stay under ignored `.local/`.
-
-`src/` owns the runtime; `tools/` owns conversion and qualification; `demo/` owns
-the one comparison page. The npm artifact contains only the built runtimes,
-types and notices. Development renderers and authoring libraries are not runtime
-dependencies.
-
-The optional source-WebP tool accepts ordinary GLBs; the source and capture must
-share world coordinates. The committed demo needs no regeneration.
-
-```sh
-node tools/turntable.mjs source.glb capture.glb output-directory 512
-node tools/unique-pool.mjs
-node tools/one-scene.mjs --modes elements --pose rotate
-node tools/one-scene.mjs --modes elements --pose stationary --lighting presentation
-```
-
-The last two commands derive 120 unique capture variants and measure their real
-canvas updates. Generated pools and benchmark results stay under `.local/`.
-`grid-performance.mjs` and `render-cost.mjs` are WebGL-only diagnostics.
+The 3D capture is embedded sidecar data in an `I3D1` RIFF chunk after the image, inside the same `.webp` file. The [WebP specification allows application-specific chunks](https://developers.google.com/speed/webp/docs/riff_container#unknown_chunks), which ordinary image readers can ignore. Image 3D reads this extra data to render the interactive view. See the [Image 3D WebP package format](docs/format.md#webp-image-package) for its layout.
