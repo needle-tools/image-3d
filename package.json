@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Interactive 3D images in a single WebP, with native image fallback and a tiny, dependency-free WebGPU/WebGL runtime.",
   "type": "module",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "engines": {
     "node": ">=22"
   },
@@ -35,7 +35,6 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:demo": "npm run build && node tools/demo.mjs",
-    "deploy": "npm run build:demo && npx --yes needle-cloud deploy demo/public --team Needle --name \"Box Imposters Runtime\"",
     "dev": "npm run build:demo && vite preview --config demo/vite.config.js",
     "convert": "node tools/export.mjs",
     "validate": "node tools/validate.mjs",
