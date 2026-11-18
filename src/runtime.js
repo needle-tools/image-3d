@@ -302,9 +302,10 @@ function cacheCapabilities(){
 let api=null,choosing=null;
 function backend(){
  return choosing??=(navigator.gpu?createGpu().catch(error=>{console.warn('img-3d uses WebGL: '+error.message);return null;}):Promise.resolve(null)).then(chosen=>{
-  api=chosen;chosen?.device.lost.then(()=>{
+  api=chosen;chosen?.device.lost.then(info=>{
    if(api!==chosen)return;epoch++;studioTextures.clear();for(const upload of uploads.values())upload.abort.abort();uploads.clear();for(const el of pending.keys())cancel(el);
    for(const r of gpu.values())r.disposed=true;gpu.clear();api=null;choosing=null;for(const el of elements)enqueue(el);
+   for(const scene of scenes)scene.onDeviceLost?.(info.reason);
   });
   return chosen;
  });
@@ -686,10 +687,10 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const 
 addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
 
 /** One shared-camera, shared-depth WebGPU scene, using the existing device and capture caches. */
-export async function createImg3dScene(canvas,{lighting,signal}={}){
+export async function createImg3dScene(canvas,{lighting,signal,onDeviceLost}={}){
  const chosen=await backend();if(!chosen)throw Error('Image3D scenes require WebGPU');
  signal?.throwIfAborted();
- const abort=new AbortController(),record={urls:new Set(),lighting:normalizeLighting(lighting)},target={};
+ const abort=new AbortController(),record={urls:new Set(),lighting:normalizeLighting(lighting),onDeviceLost},target={};
  scenes.add(record);
  let owner=chosen;const gpuFrames=new Set();
  let disposed=false,instances=[],placements=[],loadAbort,pendingDraw=null,drawFrame=0,resolveDraw,lastSettings,hitBoxes=[],fitInstances;

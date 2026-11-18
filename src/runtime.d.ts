@@ -53,7 +53,7 @@ export declare function enhanceImage(target:HTMLImageElement|HTMLPictureElement)
 export interface Img3dSceneItem {src:string;position:[number,number,number];yaw?:number;scale?:number;opacity?:number}
 export interface Img3dSceneCamera {eye:[number,number,number];target:[number,number,number];fov?:number;fit?:boolean|'width';fitReference?:{eye:[number,number,number];target:[number,number,number]};padding?:number;align?:'center'|'bottom';fog?:{near:number;far:number;opacity:number}}
 /** Experimental shared-camera scenes use the runtime's existing WebGPU device. */
-export declare function createImg3dScene(canvas:HTMLCanvasElement,options?:{lighting?:Partial<Img3d['lighting']>;signal?:AbortSignal}):Promise<{
+export declare function createImg3dScene(canvas:HTMLCanvasElement,options?:{lighting?:Partial<Img3d['lighting']>;signal?:AbortSignal;onDeviceLost?:(reason:string)=>void}):Promise<{
  load(items:readonly Img3dSceneItem[],options?:{progressive?:boolean;onLoad?:(index:number)=>void;onError?:(index:number,error:unknown)=>void}):Promise<void>;
  setOpacity(index:number,opacity:number):void;
  draw(camera:Img3dSceneCamera|(()=>Img3dSceneCamera)):Promise<boolean>;
