@@ -22,6 +22,7 @@ jobs:
       contents: write
       id-token: write
     env:
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       GITHUB_REPOSITORY_VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
     steps:
       - uses: actions/checkout@v5
@@ -44,6 +45,7 @@ jobs:
         if: github.ref == 'refs/heads/release/canary'
         run: >-
           npx --yes needle-publish-helper@next publish .
+          --webhook "$DISCORD_WEBHOOK"
           --oidc --tag canary
           --version+tag --version+time --version+hash
           --create-tag release/
@@ -51,5 +53,6 @@ jobs:
         if: github.ref == 'refs/heads/release/latest'
         run: >-
           npx --yes needle-publish-helper@next publish .
+          --webhook "$DISCORD_WEBHOOK"
           --oidc --tag latest
           --create-tag release/
