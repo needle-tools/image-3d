@@ -691,36 +691,54 @@ export async function createImg3dScene(canvas,{lighting,signal}={}){
  signal?.throwIfAborted();
  const abort=new AbortController(),record={urls:new Set(),lighting:normalizeLighting(lighting)},target={};
  scenes.add(record);
- let owner=chosen;
- let disposed=false,instances=[],placements=[],loadAbort,pendingDraw=null,drawFrame=0,resolveDraw,lastSettings,hitBoxes=[];
- async function load(items){
+ let owner=chosen;const gpuFrames=new Set();
+ let disposed=false,instances=[],placements=[],loadAbort,pendingDraw=null,drawFrame=0,resolveDraw,lastSettings,hitBoxes=[],fitInstances;
+ async function load(items,{progressive=false,onLoad,onError}={}){
   if(disposed)throw new DOMException('Scene disposed','AbortError');
   loadAbort?.abort();const loading=loadAbort=new AbortController(),combined=AbortSignal.any([abort.signal,loading.signal]);
-  const next=items.map(item=>({...item,src:new URL(item.src,document.baseURI).href}));
+  const next=items.map(item=>{if(item.opacity!==undefined&&(!Number.isFinite(item.opacity)||item.opacity<0||item.opacity>1))throw Error('Invalid scene instance opacity');return{...item,src:new URL(item.src,document.baseURI).href};});
   const oldUrls=record.urls;record.urls=new Set([...oldUrls,...next.map(item=>item.src)]);
+  if(progressive){
+   // Reserve normalized sphere bounds for every placement, independent of arrival order.
+   fitInstances=next.map(item=>{const p=item.position??[0,0,0],r=1.5*(item.scale??1),corners=[];for(const x of [-r,r])for(const y of [0,2*r])for(const z of [-r,r])corners.push([p[0]+x,p[1]+y,p[2]+z]);return{corners};});
+   placements=next;instances=next.map(()=>null);record.urls=new Set(next.map(item=>item.src));hitBoxes=[];
+   await Promise.all(next.map(async(item,index)=>{
+    let asset;
+    try{asset=await resource(item.src,combined);combined.throwIfAborted();}
+    catch(error){if(combined.aborted)throw error;onError?.(index,error);return;}
+    instances[index]={asset,instance:sceneInstance(asset.data,placements[index]),opacity:item.opacity??1};onLoad?.(index);
+   }));combined.throwIfAborted();trimCaches();return;
+  }
+  fitInstances=undefined;
   try{
    const assets=await Promise.all(next.map(item=>resource(item.src,combined)));combined.throwIfAborted();
-   instances=assets.map((asset,index)=>({asset,instance:sceneInstance(asset.data,next[index])}));placements=next;record.urls=new Set(next.map(item=>item.src));trimCaches();
+   instances=assets.map((asset,index)=>({asset,instance:sceneInstance(asset.data,next[index]),opacity:next[index].opacity??1}));placements=next;record.urls=new Set(next.map(item=>item.src));trimCaches();
   }catch(error){if(loadAbort===loading){record.urls=oldUrls;trimCaches();}throw error;}
  }
  async function draw(settings){
   if(disposed||document.hidden)return false;lastSettings=settings;
   const backendApi=await backend();if(!backendApi)throw Error('Image3D scenes require WebGPU');
-  if(instances.some(item=>item.asset.disposed||item.asset.api!==backendApi))await load(placements);
+  if(instances.some(item=>item&&(item.asset.disposed||item.asset.api!==backendApi)))await load(placements);
   if(disposed)return false;
   if(owner!==backendApi){owner.forgetScene(target);target.device=null;owner=backendApi;}
   if(pendingDraw)return pendingDraw;
   pendingDraw=new Promise((resolve,reject)=>{
    resolveDraw=resolve;
-   drawFrame=requestAnimationFrame(()=>{
+   // Keep at most three frames in flight without a full GPU fence on every frame.
+   (gpuFrames.size>=3?Promise.race(gpuFrames):Promise.resolve()).then(()=>{
+    if(disposed||document.hidden){pendingDraw=null;resolveDraw=null;resolve(false);return;}
+    drawFrame=requestAnimationFrame(()=>{
     drawFrame=0;
     try{
      if(disposed||document.hidden){resolve(false);return;}
      const settings=typeof lastSettings==='function'?lastSettings():lastSettings;
-     hitBoxes=backendApi.renderScene(target,canvas,instances,settings,record.lighting);renders++;viewRenders++;sceneRenders++;resolve(true);
+     hitBoxes=backendApi.renderScene(target,canvas,instances,settings,record.lighting,fitInstances);
+     const completed=backendApi.device.queue.onSubmittedWorkDone().then(()=>gpuFrames.delete(completed),()=>gpuFrames.delete(completed));gpuFrames.add(completed);
+     renders++;viewRenders++;sceneRenders++;resolve(true);
     }catch(error){reject(error);}
     finally{pendingDraw=null;resolveDraw=null;}
-   });
+    });
+   },error=>{pendingDraw=null;resolveDraw=null;reject(error);});
   });
   return pendingDraw;
  }
@@ -734,7 +752,12 @@ export async function createImg3dScene(canvas,{lighting,signal}={}){
   if(!instances[index]||!Number.isFinite(yaw))throw Error('Invalid scene instance rotation');
   placements[index]={...placements[index],yaw};instances[index].instance=sceneInstance(instances[index].asset.data,placements[index]);
  }
- return {load,draw,dispose,setYaw,hitTest:(x,y)=>sceneHitTest(hitBoxes,x,y)};
+ function setOpacity(index,opacity){
+  if(disposed)return;
+  if(!placements[index]||!Number.isFinite(opacity)||opacity<0||opacity>1)throw Error('Invalid scene instance opacity');
+  placements[index]={...placements[index],opacity};if(instances[index])instances[index].opacity=opacity;
+ }
+ return {load,draw,dispose,setYaw,setOpacity,hitTest:(x,y)=>sceneHitTest(hitBoxes,x,y)};
 }
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {

@@ -50,3 +50,24 @@ test('bottom alignment leaves a small explicit inset instead of empty space unde
  const bottom=Math.max(...instances.map(instance=>{const box=sceneBounds(shared,instance,1200,700);return box.bottom;}));
  assert(Math.abs(bottom-700*.98)<.01);
 });
+
+test('width fitting fills available canvas width even for a compact field',()=>{
+ const instances=[sceneInstance(data(points),{position:[-2,0,0]}),sceneInstance(data(points),{position:[5,0,-8]})];
+ for(const [w,h]of [[390,550],[800,650],[1440,760]])for(const y of [2.5,18]){
+  const padding=w<600?1.02:1.06;
+  const shared=sceneProjection({eye:[0,y,21],target:[0,1,-4],fit:'width',padding,align:'bottom'},w,h,instances);
+  const edge=Math.max(...instances.flatMap(instance=>instance.corners.map(corner=>Math.abs(new Vector3(...corner).applyMatrix4(new Matrix4().fromArray(shared.matrix)).x))));
+  assert(Math.abs(edge-1/padding)<1e-5,'Camera left unused horizontal space');
+  const boxes=instances.map(instance=>sceneBounds(shared,instance,w,h));
+  assert(Math.abs(Math.min(...boxes.map(b=>b.left))+Math.max(...boxes.map(b=>b.right))-w)<.01,'Field is not centered within available width');
+ }
+});
+
+test('keeps width framing fixed while the camera descends with a fit reference',()=>{
+ const instances=[sceneInstance(data(points),{position:[-4,0,3]}),sceneInstance(data(points),{position:[6,0,-12]})];
+ const settings={target:[0,1,-4],fit:'width',fitReference:{eye:[0,2.5,21],target:[0,1,-4]}};
+ const high=sceneProjection({...settings,eye:[0,18,21]},1200,700,instances);
+ const low=sceneProjection({...settings,eye:[0,2.5,21]},1200,700,instances);
+ assert(Math.abs(high.focal-low.focal)<1e-8,'Scrolling changes horizontal zoom');
+ assert(Math.abs(high.horizontalShift-low.horizontalShift)<1e-8,'Scrolling recenters the field horizontally');
+});

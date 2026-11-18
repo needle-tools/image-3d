@@ -22,24 +22,29 @@ export function sceneInstance(data,{position=[0,0,0],yaw=0,scale=1}){
  return {model,inverse:inverseMatrix(model),corners,scale:s,yaw,position};
 }
 /** A single fitted perspective camera in scene/world space. */
-export function sceneProjection({eye,target,fov=45,fit=true,padding=1.12,align='center'},w,h,instances){
+export function sceneProjection({eye,target,fov=45,fit=true,padding=1.12,align='center',fitReference},w,h,instances){
  if(!eye?.every(Number.isFinite)||eye.length!==3||!target?.every(Number.isFinite)||target.length!==3||!(w>0&&h>0)||!(fov>0&&fov<170)||!(padding>=1))throw Error('Invalid scene camera');
  const forward=unit(target.map((x,i)=>x-eye[i])),right=unit(cross(forward,[0,1,0])),up=cross(right,forward),aspect=w/h;
- let focal=1/Math.tan(fov*Math.PI/360);
+ const fitEye=fitReference?.eye??eye,fitTarget=fitReference?.target??target;
+ if(fitEye.length!==3||fitTarget.length!==3||!fitEye.every(Number.isFinite)||!fitTarget.every(Number.isFinite))throw Error('Invalid scene fit reference');
+ const fitForward=unit(fitTarget.map((x,i)=>x-fitEye[i])),fitRight=unit(cross(fitForward,[0,1,0])),fitUp=cross(fitRight,fitForward);
+ let focal=1/Math.tan(fov*Math.PI/360),horizontalShift=0;
  if(fit){
-  let extent=0;
-  for(const instance of instances)for(const point of instance.corners){const p=point.map((x,i)=>x-eye[i]),depth=dot(p,forward);if(depth<=.01)throw Error('Scene camera is inside the asset field');extent=Math.max(extent,Math.abs(dot(p,right))/depth/aspect,Math.abs(dot(p,up))/depth);}
-  if(extent)focal=Math.min(focal,1/(extent*padding));
+  let extent=0,left=Infinity,rightEdge=-Infinity;
+  for(const instance of instances)for(const point of instance.corners){const p=point.map((x,i)=>x-fitEye[i]),depth=dot(p,fitForward);if(depth<=.01)throw Error('Scene camera is inside the asset field');const x=dot(p,fitRight)/depth/aspect;left=Math.min(left,x);rightEdge=Math.max(rightEdge,x);extent=Math.max(extent,Math.abs(x),fit==='width'?0:Math.abs(dot(p,fitUp))/depth);}
+  if(fit==='width'&&rightEdge>left){focal=2/((rightEdge-left)*padding);horizontalShift=-(rightEdge+left)*focal/2;}
+  else if(extent)focal=Math.min(focal,1/(extent*padding));
  }
  const near=.01,far=200,rows=[[...right.map(x=>x*focal/aspect),-dot(right,eye)*focal/aspect],[...up.map(x=>x*focal),-dot(up,eye)*focal],[...forward.map(x=>x*far/(far-near)),-dot(forward,eye)*far/(far-near)-far*near/(far-near)],[...forward,-dot(forward,eye)]];
  const matrix=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++)matrix[c*4+r]=rows[r][c];
+ if(horizontalShift)for(let c=0;c<4;c++)matrix[c*4]+=horizontalShift*matrix[c*4+3];
  if(align==='bottom'&&instances.length){
   let bottom=Infinity;
   for(const instance of instances)for(const point of instance.corners){const p=[...point,1],clip=[1,3].map(row=>p.reduce((sum,v,col)=>sum+v*matrix[col*4+row],0));bottom=Math.min(bottom,clip[0]/clip[1]);}
   const shift=-.96-bottom;
   for(let c=0;c<4;c++)matrix[c*4+1]+=shift*matrix[c*4+3];
  }else if(align!=='center')throw Error('Invalid scene alignment');
- return {eye,matrix,inverse:inverseMatrix(matrix),focal,height:h};
+ return {eye,matrix,inverse:inverseMatrix(matrix),focal,horizontalShift,height:h};
 }
 export function instanceCamera(shared,instance){
  const matrix=multiply(shared.matrix,instance.model),eye=transform(instance.inverse,shared.eye);

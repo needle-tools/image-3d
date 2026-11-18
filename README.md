@@ -158,6 +158,8 @@ An Image 3D WebP is a regular WebP image. Its image data comes first, allowing t
 
 The 3D capture is embedded sidecar data in an `I3D1` RIFF chunk after the image, inside the same `.webp` file. The [WebP specification allows application-specific chunks](https://developers.google.com/speed/webp/docs/riff_container#unknown_chunks), which ordinary image readers can ignore. Image 3D reads this extra data to render the interactive view. See the [Image 3D WebP package format](docs/format.md#webp-image-package) for its layout.
 
+For programmatic shared-camera scenes and opt-in progressive loading, see [scene loading](docs/scenes.md).
+
 ## Contact
 
 Questions or feedback? Email [hi@needle.tools](mailto:hi@needle.tools).

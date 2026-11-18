@@ -204,7 +204,7 @@ struct Visible{@location(0) id:u32,@builtin(frag_depth) depth:f32}
  let ray=normalize(world-view.eye);
  let c=max(coverage(own),1e-3);
  var atmosphere=1.;if(view.fog.y>view.fog.x){atmosphere=1.-smoothstep(view.fog.x,view.fog.y,length(world-view.eye)*view.fog.z)*view.fog.w;}
- let alpha=atmosphere*covered*select(1.,min(textureSampleLevel(geometryMap,filtered,vec2f((own.x+1)*.5,own.y),0).r/c,1.),view.blended!=0);
+ let alpha=view.model.y*atmosphere*covered*select(1.,min(textureSampleLevel(geometryMap,filtered,vec2f((own.x+1)*.5,own.y),0).r/c,1.),view.blended!=0);
  if(baked){
   // Six outgoing-radiance captures blend by how closely each faced the viewer.
   var radiance=vec3f(0);var total=0.;
@@ -457,7 +457,7 @@ async function setup(device,format,features){
  const SEGMENT=256;
  function slot(frame,view,el,batch,page,clip,target=[0,0,1,1],source=[0,0,0,0]){
   const data=new ArrayBuffer(VIEW),f=new Float32Array(data),i=new Int32Array(data),u=new Uint32Array(data),light=el.lighting;
-  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f[35]=view.focal;f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index+(el.sceneBatchOffset??0);u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);if(el.sceneFog)f.set(el.sceneFog,84);f[88]=el.sceneYaw??0;
+  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f[35]=view.focal;f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index+(el.sceneBatchOffset??0);u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);if(el.sceneFog)f.set(el.sceneFog,84);f[88]=el.sceneYaw??0;f[89]=el.sceneOpacity??1;
   let segment=frame.segments.at(-1);
   if(!segment||segment.slots.length===SEGMENT){
    const k=frame.segments.length;if(!pool[k]){const buffer=device.createBuffer({size:SLOT*SEGMENT,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});pool[k]={buffer,group:device.createBindGroup({layout:viewLayout,entries:[{binding:0,resource:{buffer,size:VIEW}}]})};}
@@ -602,18 +602,25 @@ async function setup(device,format,features){
   const x=Math.max(0,Math.floor(Math.min(...projected.map(p=>p[0])))-2),y=Math.max(0,Math.floor(Math.min(...projected.map(p=>p[1])))-2);
   return[x,y,Math.max(0,Math.min(w,Math.ceil(Math.max(...projected.map(p=>p[0])))+2)-x),Math.max(0,Math.min(h,Math.ceil(Math.max(...projected.map(p=>p[1])))+2)-y)];
  }
- function renderScene(record,canvas,instances,settings,lighting){
-  const w=canvas.width,h=canvas.height,a=sceneTarget(record,canvas,w,h),shared=sceneProjection(settings,w,h,instances.map(i=>i.instance)),f=frame(),encoder=f.encoder;
+ function renderScene(record,canvas,instances,settings,lighting,fitInstances){
+  const w=canvas.width,h=canvas.height,a=sceneTarget(record,canvas,w,h),shared=sceneProjection(settings,w,h,fitInstances??instances.filter(Boolean).map(i=>i.instance)),f=frame(),encoder=f.encoder;
   let batchOffset=0;
-  const items=instances.map(({asset,instance},index)=>{
+  const items=instances.map((entry,index)=>{
+   if(!entry)return null;const {asset,instance,opacity=1}=entry;if(opacity===0)return null;
    const c=Math.cos(instance.yaw),s=Math.sin(instance.yaw),rotate=v=>[c*v[0]-s*v[2],v[1],s*v[0]+c*v[2]];
    const localLighting={...lighting,direction:rotate(lighting.direction),...(lighting.lights?{lights:lighting.lights.map(light=>({...light,direction:rotate(light.direction)}))}:{}),environmentRotation:lighting.environmentRotation??0};
    const fog=settings.fog;
    if(fog&&(!Number.isFinite(fog.near)||!Number.isFinite(fog.far)||fog.far<=fog.near||!(fog.opacity>=0&&fog.opacity<=1)))throw Error('Invalid scene fog');
-   const el={lighting:localLighting,groundShadow:true,sceneBatchOffset:batchOffset,sceneYaw:instance.yaw,sceneFog:fog?[fog.near,fog.far,instance.scale,fog.opacity]:null};batchOffset+=asset.batches.length;
+   if(fog?.opacity===1){
+    const points=[...instance.corners],shadow=groundShadow(asset.data);
+    if(shadow){const [x,z,sw,sh]=shadow.bounds;for(const px of [x,x+sw])for(const pz of [z,z+sh])points.push(instancePoint(instance,[px,shadow.floor,pz]));}
+    const distance=Math.hypot(...shared.eye.map((eye,axis)=>{const values=points.map(p=>p[axis]);return Math.max(Math.min(...values)-eye,0,eye-Math.max(...values));}));
+    if(distance>=fog.far)return null;
+   }
+   const el={lighting:localLighting,groundShadow:true,sceneBatchOffset:batchOffset,sceneYaw:instance.yaw,sceneOpacity:opacity,sceneFog:fog?[fog.near,fog.far,instance.scale,fog.opacity]:null};batchOffset+=asset.batches.length;
    if(batchOffset>4096)throw Error('Too many scene batches');
    const item={index,asset,instance,el,view:instanceCamera(shared,instance),w,h,rect:[0,0,w,h]};item.scissor=sceneScissor(item,w,h);return item;
-  }).filter(item=>item.scissor[2]&&item.scissor[3]);
+  }).filter(item=>item&&item.scissor[2]&&item.scissor[3]);
   const region=(pass,item)=>{pass.setViewport(0,0,w,h,0,1);pass.setScissorRect(...item.scissor);};
   let pass=encoder.beginRenderPass({colorAttachments:[{view:a.color.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});
   pass.setPipeline(groundPipeline);
