@@ -750,14 +750,20 @@ export async function createImg3dScene(canvas,{lighting,signal}={}){
  function setYaw(index,yaw){
   if(disposed)return;
   if(!instances[index]||!Number.isFinite(yaw))throw Error('Invalid scene instance rotation');
-  placements[index]={...placements[index],yaw};instances[index].instance=sceneInstance(instances[index].asset.data,placements[index]);
+  setPose(index,{position:placements[index].position??[0,0,0],yaw});
+ }
+ function setPose(index,{position,yaw}){
+  if(disposed)return;
+  if(!instances[index]||position?.length!==3||!position.every(Number.isFinite)||!Number.isFinite(yaw))throw Error('Invalid scene instance pose');
+  placements[index]={...placements[index],position:[...position],yaw};
+  instances[index].instance=sceneInstance(instances[index].asset.data,placements[index]);
  }
  function setOpacity(index,opacity){
   if(disposed)return;
   if(!placements[index]||!Number.isFinite(opacity)||opacity<0||opacity>1)throw Error('Invalid scene instance opacity');
   placements[index]={...placements[index],opacity};if(instances[index])instances[index].opacity=opacity;
  }
- return {load,draw,dispose,setYaw,setOpacity,hitTest:(x,y)=>sceneHitTest(hitBoxes,x,y)};
+ return {load,draw,dispose,setYaw,setPose,setOpacity,hitTest:(x,y)=>sceneHitTest(hitBoxes,x,y)};
 }
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {

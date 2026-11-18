@@ -58,6 +58,8 @@ export declare function createImg3dScene(canvas:HTMLCanvasElement,options?:{ligh
  setOpacity(index:number,opacity:number):void;
  draw(camera:Img3dSceneCamera|(()=>Img3dSceneCamera)):Promise<boolean>;
  setYaw(index:number,yaw:number):void;
+ /** Update the world-space position and yaw of one loaded instance. */
+ setPose(index:number,pose:{position:[number,number,number];yaw:number}):void;
  /** Bounding-box hit in destination canvas pixel coordinates; nearest instance wins. */
  hitTest(x:number,y:number):number;
  dispose():void;

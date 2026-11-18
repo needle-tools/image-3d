@@ -61,13 +61,17 @@ test('one scene shares depth, fog, device and capture caches without canvas copi
    let hit;
    for(let y=0;y<240&&!hit;y+=4)for(let x=0;x<320;x+=4)if(scene.hitTest(x,y)===0){hit={x,y};break;}
    scene.setYaw(0,.8);await draw(camera);const spun=canvas.toDataURL();
+   scene.setPose(0,{position:[0,2,2],yaw:.8});await draw(camera);const lifted=canvas.toDataURL();
+   scene.setPose(0,{position:[0,0,2],yaw:.8});await draw(camera);const grounded=canvas.toDataURL();
    await draw({...camera,fog:{near:1,far:2,opacity:.8}});const fogged=canvas.toDataURL();
    await draw({...camera,fog:{near:1,far:2,opacity:1}});const fogHit=scene.hitTest(hit.x,hit.y);
    await scene.load([{src:'/glass.i3d',position:[0,0,2]},blue]);await draw(camera);const transparent=canvas.toDataURL();
    const image=new runtime.Img3d();image.style.cssText='display:block;width:80px;height:80px';image.src='/red.i3d';document.body.append(image);await new Promise((resolve,reject)=>{image.addEventListener('load',resolve,{once:true});image.addEventListener('error',reject,{once:true});});await image.draw();
    const before=runtime.Img3d.statistics,planeCopies=copies;scene.dispose();const after=runtime.Img3d.statistics;image.remove();
-   return{progress,first,reversed,spun,fogged,transparent,hit,before,after,planeCopies,sceneCopies,sampled,blockedDraws,fogHit,lateSample,expectedSample};
+   return{progress,first,reversed,spun,lifted,grounded,fogged,transparent,hit,before,after,planeCopies,sceneCopies,sampled,blockedDraws,fogHit,lateSample,expectedSample};
   });
+  assert.notEqual(result.lifted,result.spun,'Changing world Y moves the instance');
+  assert.equal(result.grounded,result.spun,'Restoring the pose restores the original frame');
   const pixels=async url=>sharp(Buffer.from(url.split(',')[1],'base64')).ensureAlpha().raw().toBuffer();
   const partial=await pixels(result.progress.partial),faded=await pixels(result.progress.faded);
   const alphaSum=p=>p.reduce((sum,v,i)=>sum+(i%4===3?v:0),0);
