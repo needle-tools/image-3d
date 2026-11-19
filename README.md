@@ -101,10 +101,17 @@ See the [runtime API and capture format](https://github.com/needle-tools/image-3
 
 ## Use studio lighting
 
-Opt in to the studio environment on a live capture:
+Choose one of these ways to enable studio lighting on a live capture.
+
+For a regular WebP image enhanced by the runtime, use `data-environment`:
 
 ```html
 <img data-img-3d data-environment="studio" src="./model.webp" alt="Product">
+```
+
+If you're using the `<img-3d>` element, use `environment` instead:
+
+```html
 <img-3d environment="studio" src="./model.webp"></img-3d>
 ```
 
@@ -114,7 +121,7 @@ The viewer fetches and shares the roughly 35 kB map only when a preview requests
 <script type="module" src="https://cdn.jsdelivr.net/npm/@needle-tools/image-3d@0.1.2/dist/img-3d.js"></script>
 ```
 
-The npm asset is also available at `@needle-tools/image-3d/studio.json.gz` for custom integrations. [Environment lighting API](https://github.com/needle-tools/image-3d/blob/main/docs/format.md)
+For custom integrations, the npm asset resolves at `@needle-tools/image-3d/env/studio`. For example, Vite can import its URL with `@needle-tools/image-3d/env/studio?url`. [Environment lighting API](https://github.com/needle-tools/image-3d/blob/main/docs/format.md)
 
 ## Create a capture
 

@@ -10,7 +10,7 @@ export function checkPackage(manifest,files){
  for(const key of ['dependencies','optionalDependencies','peerDependencies'])if(Object.keys(manifest[key]??{}).length)throw Error('Runtime package must have no dependencies.');
  const required=['package.json','README.md','LICENSE','dist/img-3d.js','dist/img-3d-xuastc.js','dist/studio.json.gz','src/runtime.d.ts','LICENSES/three-MIT.txt','LICENSES/mesh-effects-MIT.txt'];
  for(const file of required)if(!files.includes(file))throw Error('Missing package file: '+file);
- if(manifest.exports?.['./studio.json.gz']!=='./dist/studio.json.gz')throw Error('Missing studio environment export.');
+ if(manifest.exports?.['./env/studio']!=='./dist/studio.json.gz')throw Error('Missing studio environment export.');
  for(const entry of ['.','./xuastc']){
   const exported=manifest.exports?.[entry];
   if(!exported?.import||!exported?.types)throw Error('Missing browser import or types export: '+entry);
