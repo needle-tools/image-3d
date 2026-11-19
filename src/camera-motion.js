@@ -3,10 +3,10 @@ export const cameraPose=el=>el.renderCamera??el;
 
 /** One animation clock for every element; settled or hidden views do no work. */
 export function createCameraMotion(redraw){
- const moving=new Map();let frame=0;
+ const moving=new Map(),rotating=new Map();let frame=0;
  function stop(el){
   moving.delete(el);delete el.renderCamera;
-  if(!moving.size&&frame){cancelAnimationFrame(frame);frame=0;}
+  if(!moving.size&&!rotating.size&&frame){cancelAnimationFrame(frame);frame=0;}
  }
  function hold(el,from=cameraPose(el)){
   el.renderCamera=Object.fromEntries(axes.map(key=>[key,from[key]]));
@@ -33,7 +33,16 @@ export function createCameraMotion(redraw){
    }
    redraw(el);
   }
-  if(moving.size)frame=requestAnimationFrame(step);
+  for(const [el,rotation]of rotating){
+   if(!el.isConnected||!el.visible||document.hidden){rotating.delete(el);continue;}
+   if(moving.has(el)){rotation.last=now;continue;}
+   const elapsed=now-rotation.last;
+   if(elapsed<32)continue;
+   rotation.last=now;
+   el.yaw+=rotation.speed*Math.min(elapsed,64)/1000;
+   redraw(el);
+  }
+  if(moving.size||rotating.size)frame=requestAnimationFrame(step);
  }
  function to(el,duration){
   const target=Object.fromEntries(axes.map(key=>[key,el[key]])),previous=moving.get(el);
@@ -45,5 +54,14 @@ export function createCameraMotion(redraw){
   hold(el,from);const now=performance.now();moving.set(el,{from,target,delta,duration,start:now,last:now});
   if(!frame)frame=requestAnimationFrame(step);
  }
- return{hold,to,stop};
+ function rotate(el,speed){
+  if(!speed){
+   rotating.delete(el);
+   if(!moving.size&&!rotating.size&&frame){cancelAnimationFrame(frame);frame=0;}
+  }else if(rotating.get(el)?.speed!==speed){
+   rotating.set(el,{speed,last:performance.now()});
+   if(!frame)frame=requestAnimationFrame(step);
+  }
+ }
+ return{hold,to,stop,rotate};
 }

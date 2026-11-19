@@ -42,6 +42,20 @@ The browser chooses the file, and the 3D view uses that same file. The `w` value
 
 To enhance a whole `<picture>`, put `data-img-3d` on the `<picture>` instead of its `<img>`.
 
+## Auto-rotate a capture
+
+Add `auto-rotate` to `<img-3d>` for a slow rotation, or set a signed speed
+in radians per second. The default is 0.3 rad/s. A negative speed reverses
+direction. Use `data-auto-rotate` on an enhanced native image or picture.
+
+```html
+<img-3d src="./model.webp" auto-rotate="-.2"></img-3d>
+<img data-img-3d data-auto-rotate src="./model.webp" alt="Product">
+```
+
+Rotation waits for the capture, pauses while hidden, and stops when the
+viewer is used. Reduced-motion preferences disable it.
+
 ## Control the view with JavaScript
 
 You can also enhance an image already on the page:

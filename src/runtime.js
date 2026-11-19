@@ -277,6 +277,8 @@ const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
 /** Optional trusted XUASTC entry; capture files never supply executable code. */
 export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
 const cameraMotion=createCameraMotion(el=>enqueue(el));
+const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
+reducedMotion.addEventListener('change',()=>{for(const el of elements)el.syncAutoRotation();});
 const scenes=new Set();
 const elements=new Set(),pending=new Map(),cpu=new Map(),gpu=new Map(),uploads=new Map(),programs=new Map(),lastRendered=new WeakMap();
 const limits={entries:8,cpuBytes:32*1024*1024,gpuBytes:64*1024*1024};
@@ -681,9 +683,9 @@ async function pump(){
   }
  }}finally{running=false;if(pending.size&&!document.hidden)pump();}
 }
-const intersection=new IntersectionObserver(entries=>{for(const {target:el,isIntersecting}of entries){el.visible=isIntersecting;if(isIntersecting)el.load();else{cameraMotion.stop(el);el.abort?.abort();cancel(el);dropSurface(el);}}trimCaches();},{rootMargin:'128px'});
+const intersection=new IntersectionObserver(entries=>{for(const {target:el,isIntersecting}of entries){el.visible=isIntersecting;el.syncAutoRotation();if(isIntersecting)el.load();else{cameraMotion.stop(el);el.abort?.abort();cancel(el);dropSurface(el);}}trimCaches();},{rootMargin:'128px'});
 const resize=new ResizeObserver(entries=>{for(const {target}of entries)target.load();});
-document.addEventListener('visibilitychange',()=>{if(document.hidden){for(const el of elements)cameraMotion.stop(el);}else{for(const el of elements)enqueue(el);pump();}});
+document.addEventListener('visibilitychange',()=>{for(const el of elements)el.syncAutoRotation();if(document.hidden){for(const el of elements)cameraMotion.stop(el);}else{for(const el of elements)enqueue(el);pump();}});
 addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
 
 /** One shared-camera, shared-depth WebGPU scene, using the existing device and capture caches. */
@@ -768,7 +770,7 @@ export async function createImg3dScene(canvas,{lighting,signal,onDeviceLost}={})
 }
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {
- static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit'];
+ static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit','auto-rotate'];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
   return {sceneCount:scenes.size,sceneRenders,backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length+(api?.sceneContexts??0),attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
@@ -805,6 +807,18 @@ export class Img3d extends HTMLElement {
   this.distance=this.boundsFit.distance;this.layoutKey=null;cameraMotion.stop(this);enqueue(this);
   return this.distance;
  }
+ syncAutoRotation(){
+  const attribute=this.getAttribute('auto-rotate');
+  const speed=attribute===null ? 0 : attribute.trim()==='' ? 0.3 : Number(attribute);
+  const active=this.isConnected&&this.visible&&!document.hidden&&!reducedMotion.matches&&
+   !this.autoRotationInterrupted&&this.loadedGeneration===this.generation;
+  cameraMotion.rotate(this,active&&Number.isFinite(speed)?speed:0);
+ }
+ stopAutoRotation(){
+  if(!this.hasAttribute('auto-rotate'))return;
+  this.autoRotationInterrupted=true;
+  cameraMotion.rotate(this,0);
+ }
  syncSizing(){
   for(const name of ['width','height']){const n=Number(this.getAttribute(name)),value=n>0?n+'px':'';if(this.style.getPropertyValue('--img3d-'+name)!==value){if(value)this.style.setProperty('--img3d-'+name,value);else this.style.removeProperty('--img3d-'+name);}}
   const ratio=String(this.frameRatio);if(this.style.getPropertyValue('--img3d-ratio')!==ratio)this.style.setProperty('--img3d-ratio',ratio);
@@ -816,14 +830,16 @@ export class Img3d extends HTMLElement {
   super();this.generation=0;this.visible=false;
   this.attachShadow({mode:'open'}).innerHTML='<style>:host{display:inline-block;position:relative;width:var(--img3d-width,300px);height:var(--img3d-height,auto);aspect-ratio:var(--img3d-ratio,1);object-fit:contain}canvas{position:absolute;inset:0;box-sizing:border-box;padding:inherit;width:100%;height:100%;display:block;outline:none;touch-action:pan-y pinch-zoom}span{position:absolute;padding:1em;pointer-events:none}</style><span role="status"></span><canvas tabindex="0" aria-label="3D model. Drag or arrow keys rotate; plus and minus zoom; Home resets."></canvas>';
   this.canvas=this.shadowRoot.querySelector('canvas');this.status=this.shadowRoot.querySelector('span');this.reset();
-  this.canvas.onpointerdown=e=>{if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}const pose=cameraPose(this);Object.assign(this,{yaw:pose.yaw,pitch:pose.pitch,distance:pose.distance});cameraMotion.stop(this);this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
+  this.addEventListener('load',()=>this.syncAutoRotation());
+  this.canvas.onfocus=()=>this.stopAutoRotation();
+  this.canvas.onpointerdown=e=>{this.stopAutoRotation();if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}const pose=cameraPose(this);Object.assign(this,{yaw:pose.yaw,pitch:pose.pitch,distance:pose.distance});cameraMotion.stop(this);this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
   this.canvas.onpointermove=e=>{if(!this.pointer)return;if(this.pointer[2]==='touch'&&Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;cameraMotion.hold(this);this.yaw-=(e.clientX-this.pointer[0])*.01;this.pitch=Math.max(-1.5,Math.min(1.5,this.pitch+(e.clientY-this.pointer[1])*.01));this.pointer=[e.clientX,e.clientY,e.pointerType];cameraMotion.to(this);};
   this.canvas.onpointerup=this.canvas.onpointercancel=()=>{this.pointer=null;};
-  this.canvas.onwheel=e=>{if(!e.altKey)return;e.preventDefault();this.distance=Math.max(1.8,Math.min(15,this.distance*Math.exp(e.deltaY*.001)));enqueue(this);};
+  this.canvas.onwheel=e=>{if(!e.altKey)return;this.stopAutoRotation();e.preventDefault();this.distance=Math.max(1.8,Math.min(15,this.distance*Math.exp(e.deltaY*.001)));enqueue(this);};
   this.canvas.ondblclick=()=>this.reset();
   this.canvas.onkeydown=e=>{
    if(!['Home','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-'].includes(e.key))return;
-   cameraMotion.stop(this);
+   this.stopAutoRotation();cameraMotion.stop(this);
    if(e.key==='Home')this.reset();else if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;
    else if(e.key==='ArrowUp')this.pitch=Math.min(1.5,this.pitch+.1);else if(e.key==='ArrowDown')this.pitch=Math.max(-1.5,this.pitch-.1);
    else if(e.key==='+'||e.key==='=')this.distance=Math.max(1.8,this.distance*.9);else if(e.key==='-')this.distance=Math.min(15,this.distance/.9);else return;
@@ -835,13 +851,13 @@ export class Img3d extends HTMLElement {
  // with the same handlers serves the WebGL fallback.
  replaceCanvas(){
   const old=this.canvas,next=old.cloneNode(false);
-  for(const name of ['onpointerdown','onpointermove','onpointerup','onpointercancel','onwheel','ondblclick','onkeydown'])next[name]=old[name];
+  for(const name of ['onfocus','onpointerdown','onpointermove','onpointerup','onpointercancel','onwheel','ondblclick','onkeydown'])next[name]=old[name];
   old.replaceWith(next);this.canvas=next;this.gpuContext=this.gpuDevice=null;
  }
  connectedCallback(){elements.add(this);this.syncSizing();resize.observe(this);intersection.observe(this);this.load();}
  disconnectedCallback(){elements.delete(this);resize.unobserve(this);intersection.unobserve(this);this.visible=false;this.release();if(!elements.size)clearCaches();}
- attributeChangedCallback(name){if(!this.isConnected)return;if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
- release(){cameraMotion.stop(this);this.boundsFit=null;this.loadingUrl=null;this.metadata=null;this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
+ attributeChangedCallback(name){if(!this.isConnected)return;if(name==='auto-rotate'){this.autoRotationInterrupted=false;this.syncAutoRotation();return;}if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;this.syncAutoRotation();}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
+ release(){cameraMotion.rotate(this,0);cameraMotion.stop(this);this.boundsFit=null;this.loadingUrl=null;this.metadata=null;this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
  async load(){
   if(!this.isConnected||!this.visible)return false;
   const url=this.pickSource();
@@ -866,7 +882,7 @@ export class Img3d extends HTMLElement {
    finally{if(generation===this.generation){this.loadingUrl=null;this.adaptiveLoad=false;trimCaches();}}
   })();
  }
- fail(error){cameraMotion.stop(this);this.data=null;this.loadedGeneration=-1;blank(this);const asset=gpu.get(this.url);if(asset)lastRendered.set(this,viewState(this,asset,...dimensions(this)));this.status.textContent=error.message;this.dispatchEvent(new CustomEvent('error',{detail:error}));}
+ fail(error){cameraMotion.rotate(this,0);cameraMotion.stop(this);this.data=null;this.loadedGeneration=-1;blank(this);const asset=gpu.get(this.url);if(asset)lastRendered.set(this,viewState(this,asset,...dimensions(this)));this.status.textContent=error.message;this.dispatchEvent(new CustomEvent('error',{detail:error}));}
  draw(){
   this.skipIntro=true;cameraMotion.stop(this);
   // A load event can change camera settings before its first enqueue completes.
