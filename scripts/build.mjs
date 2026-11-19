@@ -1,6 +1,6 @@
 import { build } from 'esbuild';
 import { gzipSync, brotliCompressSync } from 'node:zlib';
-import { readFile } from 'node:fs/promises';
+import { copyFile, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {surfaceCrossingWgsl,surfaceCrossingGlsl} from '../src/surface-shader.js';
@@ -12,6 +12,7 @@ const surfaceShader={name:'captured-surface-shader',setup(build){
 }};
 await build({ entryPoints:[fileURLToPath(new URL('src/runtime.js',root))], outfile:fileURLToPath(new URL('dist/img-3d.js',root)), bundle:true, minify:true, format:'esm', target:'es2022', plugins:[surfaceShader], legalComments:'none' });
 const bytes=await readFile(new URL('dist/img-3d.js',root));
+await copyFile(new URL('demo/studio.json.gz',root),new URL('dist/studio.json.gz',root));
 console.log(`img-3d: ${bytes.length} bytes; gzip ${gzipSync(bytes).length}; Brotli ${brotliCompressSync(bytes).length}. No dependencies.`);
 
 const pin=JSON.parse(await readFile(new URL('src/xuastc/source.json',root),'utf8'));

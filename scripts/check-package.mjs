@@ -8,8 +8,9 @@ export function checkPackage(manifest,files){
  if(manifest.name!=='@needle-tools/image-3d'||manifest.publishConfig?.access!=='public')throw Error('Unexpected package identity or publish access.');
  if(!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(manifest.version))throw Error('Set a stable major.minor.patch base version in package.json.');
  for(const key of ['dependencies','optionalDependencies','peerDependencies'])if(Object.keys(manifest[key]??{}).length)throw Error('Runtime package must have no dependencies.');
- const required=['package.json','README.md','LICENSE','dist/img-3d.js','dist/img-3d-xuastc.js','src/runtime.d.ts','LICENSES/three-MIT.txt','LICENSES/mesh-effects-MIT.txt'];
+ const required=['package.json','README.md','LICENSE','dist/img-3d.js','dist/img-3d-xuastc.js','dist/studio.json.gz','src/runtime.d.ts','LICENSES/three-MIT.txt','LICENSES/mesh-effects-MIT.txt'];
  for(const file of required)if(!files.includes(file))throw Error('Missing package file: '+file);
+ if(manifest.exports?.['./studio.json.gz']!=='./dist/studio.json.gz')throw Error('Missing studio environment export.');
  for(const entry of ['.','./xuastc']){
   const exported=manifest.exports?.[entry];
   if(!exported?.import||!exported?.types)throw Error('Missing browser import or types export: '+entry);

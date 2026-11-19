@@ -277,6 +277,18 @@ const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
 /** Optional trusted XUASTC entry; capture files never supply executable code. */
 export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
 const cameraMotion=createCameraMotion(el=>enqueue(el));
+let studioLighting;
+function loadStudioLighting(){
+ return studioLighting??=fetch(new URL('./studio.json.gz',import.meta.url)).then(async response=>{
+  if(!response.ok)throw Error('Studio environment: HTTP '+response.status);
+  const bytes=new Uint8Array(await response.arrayBuffer());
+  const stream=new Blob([bytes]).stream();
+  const compressed=bytes[0]===31&&bytes[1]===139;
+  const {size,levels,data}=await new Response(compressed?stream.pipeThrough(new DecompressionStream('gzip')):stream).json();
+  const pixels=Uint8Array.from(atob(data),character=>character.charCodeAt(0));
+  return normalizeLighting({environment:{size,levels,data:new Uint16Array(pixels.buffer)},environmentIntensity:1,lights:[]});
+ }).catch(error=>{studioLighting=undefined;console.warn('Image 3D studio environment unavailable',error);});
+}
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)');
 reducedMotion.addEventListener('change',()=>{for(const el of elements)el.syncAutoRotation();});
 const scenes=new Set();
@@ -770,7 +782,7 @@ export async function createImg3dScene(canvas,{lighting,signal,onDeviceLost}={})
 }
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {
- static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit','auto-rotate'];
+ static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit','auto-rotate','environment','data-environment'];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
   return {sceneCount:scenes.size,sceneRenders,backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length+(api?.sceneContexts??0),attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
@@ -778,10 +790,22 @@ export class Img3d extends HTMLElement {
  get textureBytes(){return gpu.get(this.url)?.bytes??0;}
  get textureFormat(){return gpu.get(this.url)?.textureFormat??null;}
  get transcodeMilliseconds(){return gpu.get(this.url)?.transcodeMilliseconds??0;}
- get lighting(){return this.light??{direction:[-.6,1,1],intensity:2.5,ambient:1};}
+ get lighting(){return this.light??this.studioLight??{direction:[-.6,1,1],intensity:2.5,ambient:1};}
  set lighting(value){
-  const previous=this.light?.environment;this.light=normalizeLighting(value);if(previous!==this.light.environment)trimCaches();
+  const previous=this.lighting.environment;this.light=value==null?undefined:normalizeLighting(value);if(previous!==this.lighting.environment)trimCaches();
   enqueue(this);
+ }
+ syncStudioLighting(){
+  const wantsStudio=()=> (this.getAttribute('environment')??this.getAttribute('data-environment'))==='studio';
+  if(!wantsStudio()){
+   if(this.studioLight){this.studioLight=undefined;trimCaches();enqueue(this);}
+   return;
+  }
+  void loadStudioLighting().then(lighting=>{
+   if(!lighting||!this.isConnected||!wantsStudio()||this.studioLight===lighting)return;
+   this.studioLight=lighting;
+   enqueue(this);
+  });
  }
  get groundShadow(){return this.shadowEnabled??false;}
  set groundShadow(value){this.shadowEnabled=!!value;enqueue(this);}
@@ -854,9 +878,9 @@ export class Img3d extends HTMLElement {
   for(const name of ['onfocus','onpointerdown','onpointermove','onpointerup','onpointercancel','onwheel','ondblclick','onkeydown'])next[name]=old[name];
   old.replaceWith(next);this.canvas=next;this.gpuContext=this.gpuDevice=null;
  }
- connectedCallback(){elements.add(this);this.syncSizing();resize.observe(this);intersection.observe(this);this.load();}
+ connectedCallback(){elements.add(this);this.syncSizing();this.syncStudioLighting();resize.observe(this);intersection.observe(this);this.load();}
  disconnectedCallback(){elements.delete(this);resize.unobserve(this);intersection.unobserve(this);this.visible=false;this.release();if(!elements.size)clearCaches();}
- attributeChangedCallback(name){if(!this.isConnected)return;if(name==='auto-rotate'){this.autoRotationInterrupted=false;this.syncAutoRotation();return;}if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;this.syncAutoRotation();}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
+ attributeChangedCallback(name){if(!this.isConnected)return;if(name==='auto-rotate'){this.autoRotationInterrupted=false;this.syncAutoRotation();return;}if(name==='environment'||name==='data-environment'){this.syncStudioLighting();return;}if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;this.syncAutoRotation();}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
  release(){cameraMotion.rotate(this,0);cameraMotion.stop(this);this.boundsFit=null;this.loadingUrl=null;this.metadata=null;this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
  async load(){
   if(!this.isConnected||!this.visible)return false;

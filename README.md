@@ -97,7 +97,24 @@ Both forms support `object-fit` and `object-position`. Framing stays fixed while
 
 Drag or use the arrow keys to rotate, use `+`, `-` or Alt+wheel to zoom, and double-click or press Home to reset. Vertical touch gestures allow page scrolling.
 
-See the [runtime API and capture format](docs/format.md) for lighting, responsive `.i3d` sources and other options.
+See the [runtime API and capture format](https://github.com/needle-tools/image-3d/blob/main/docs/format.md) for responsive `.i3d` sources and other options.
+
+## Use studio lighting
+
+Opt in to the studio environment on a live capture:
+
+```html
+<img data-img-3d data-environment="studio" src="./model.webp" alt="Product">
+<img-3d environment="studio" src="./model.webp"></img-3d>
+```
+
+The viewer fetches and shares the roughly 35 kB map only when a preview requests it. For a self-hosted runtime, place `studio.json.gz` next to `img-3d.js`. With jsDelivr, the viewer loads the map from the same npm package version automatically.
+
+```html
+<script type="module" src="https://cdn.jsdelivr.net/npm/@needle-tools/image-3d@0.1.1/dist/img-3d.js"></script>
+```
+
+The npm asset is also available at `@needle-tools/image-3d/studio.json.gz` for custom integrations. [Environment lighting API](https://github.com/needle-tools/image-3d/blob/main/docs/format.md)
 
 ## Create a capture
 

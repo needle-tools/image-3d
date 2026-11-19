@@ -24,6 +24,7 @@
       "types": "./src/runtime.d.ts",
       "import": "./dist/img-3d-xuastc.js"
     },
+    "./studio.json.gz": "./dist/studio.json.gz",
     "./package.json": "./package.json"
   },
   "files": [
