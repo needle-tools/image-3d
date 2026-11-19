@@ -2,6 +2,14 @@
 
 Display an interactive 3D capture with a regular HTML image and one JavaScript file. The browser runtime has no dependencies and uses WebGPU or WebGL 2.
 
+## Interactive examples
+
+Select a WebP preview to open it in the interactive viewer.
+
+| V8 engine | Futuristic motorcycle |
+| --- | --- |
+| <a href="https://cloud.needle.tools/view?file=ZUBcksZJ5HAV-QXzOI-image3d-512"><img src="https://cloud.needle.tools/-/assets/ZUBcksZJ5HAV-QXzOI-image3d-512/file.webp" alt="Open the interactive V8 engine example" width="200"></a> | <a href="https://cloud.needle.tools/view?file=ZUBcksAAb43-Z1CEnlr-image3d-512"><img src="https://cloud.needle.tools/-/assets/ZUBcksAAb43-Z1CEnlr-image3d-512/file.webp" alt="Open the interactive motorcycle example" width="200"></a> |
+
 ## Quick start: use an `<img>`
 
 Place `img-3d.js` and your capture on your website, then add `data-img-3d` to the image:
