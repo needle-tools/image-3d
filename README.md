@@ -111,7 +111,7 @@ Opt in to the studio environment on a live capture:
 The viewer fetches and shares the roughly 35 kB map only when a preview requests it. For a self-hosted runtime, place `studio.json.gz` next to `img-3d.js`. With jsDelivr, the viewer loads the map from the same npm package version automatically.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/npm/@needle-tools/image-3d@0.1.1/dist/img-3d.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@needle-tools/image-3d@0.1.2/dist/img-3d.js"></script>
 ```
 
 The npm asset is also available at `@needle-tools/image-3d/studio.json.gz` for custom integrations. [Environment lighting API](https://github.com/needle-tools/image-3d/blob/main/docs/format.md)
