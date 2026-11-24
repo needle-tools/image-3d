@@ -1,6 +1,6 @@
 import {sceneInstance,sceneHitTest} from './scene-camera.js';
 import {cameraPose,createCameraMotion} from './camera-motion.js';
-import {boundsFrame,orbitEye} from './bounds-fit.js';
+import {boundsFrame,orbitEye,orbitPitchLimit} from './bounds-fit.js';
 import {enhanceImage,installNativeImages} from './native-image.js';
 export {enhanceImage};
 import {captureBytes} from './container.js';
@@ -857,7 +857,7 @@ export class Img3d extends HTMLElement {
   this.addEventListener('load',()=>this.syncAutoRotation());
   this.canvas.onfocus=()=>this.stopAutoRotation();
   this.canvas.onpointerdown=e=>{this.stopAutoRotation();if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}const pose=cameraPose(this);Object.assign(this,{yaw:pose.yaw,pitch:pose.pitch,distance:pose.distance});cameraMotion.stop(this);this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
-  this.canvas.onpointermove=e=>{if(!this.pointer)return;if(this.pointer[2]==='touch'&&Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;cameraMotion.hold(this);this.yaw-=(e.clientX-this.pointer[0])*.01;this.pitch=Math.max(-1.5,Math.min(1.5,this.pitch+(e.clientY-this.pointer[1])*.01));this.pointer=[e.clientX,e.clientY,e.pointerType];cameraMotion.to(this);};
+  this.canvas.onpointermove=e=>{if(!this.pointer)return;if(this.pointer[2]==='touch'&&Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;cameraMotion.hold(this);this.yaw-=(e.clientX-this.pointer[0])*.01;this.pitch=Math.max(-orbitPitchLimit,Math.min(orbitPitchLimit,this.pitch+(e.clientY-this.pointer[1])*.01));this.pointer=[e.clientX,e.clientY,e.pointerType];cameraMotion.to(this);};
   this.canvas.onpointerup=this.canvas.onpointercancel=()=>{this.pointer=null;};
   this.canvas.onwheel=e=>{if(!e.altKey)return;this.stopAutoRotation();e.preventDefault();this.distance=Math.max(1.8,Math.min(15,this.distance*Math.exp(e.deltaY*.001)));enqueue(this);};
   this.canvas.ondblclick=()=>this.reset();
@@ -865,7 +865,7 @@ export class Img3d extends HTMLElement {
    if(!['Home','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-'].includes(e.key))return;
    this.stopAutoRotation();cameraMotion.stop(this);
    if(e.key==='Home')this.reset();else if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;
-   else if(e.key==='ArrowUp')this.pitch=Math.min(1.5,this.pitch+.1);else if(e.key==='ArrowDown')this.pitch=Math.max(-1.5,this.pitch-.1);
+   else if(e.key==='ArrowUp')this.pitch=Math.min(orbitPitchLimit,this.pitch+.1);else if(e.key==='ArrowDown')this.pitch=Math.max(-orbitPitchLimit,this.pitch-.1);
    else if(e.key==='+'||e.key==='=')this.distance=Math.max(1.8,this.distance*.9);else if(e.key==='-')this.distance=Math.min(15,this.distance/.9);else return;
    e.preventDefault();enqueue(this);
   };

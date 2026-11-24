@@ -43,3 +43,14 @@ test('projects off-center points like a conventional 30-degree camera for both v
 		}
 	}
 });
+test('pitch beyond the orbit limit stops at the limit instead of crossing over the pole',()=>{
+	for(const sign of [1,-1]){
+		const limit=orbitEye({yaw:.3,pitch:sign*1.5,distance:4});
+		for(const pitch of [1.6,Math.PI/2,2,3])assert.deepEqual(orbitEye({yaw:.3,pitch:sign*pitch,distance:4}),limit);
+		const expected=camera({yaw:.3,pitch:sign*1.5,distance:4},200,100);
+		for(const pitch of [Math.PI/2,2]){
+			const actual=camera({yaw:.3,pitch:sign*pitch,distance:4},200,100);
+			assert.deepEqual(actual.eye,expected.eye);assert.deepEqual([...actual.matrix],[...expected.matrix]);
+		}
+	}
+});

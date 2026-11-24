@@ -19,6 +19,10 @@ export function boundsFrame(points,{aspect,fov=30,padding=1.1}={}){
 	};
 }
 
+/** Orbit pitch in radians stays short of the poles, where the view's up direction is undefined. */
+export const orbitPitchLimit=1.5;
+
 export function orbitEye(view,center=[0,0,0]){
-	return [Math.sin(view.yaw)*Math.cos(view.pitch)*view.distance,Math.sin(view.pitch)*view.distance,Math.cos(view.yaw)*Math.cos(view.pitch)*view.distance].map((value,axis)=>value+center[axis]);
+	const pitch=Math.max(-orbitPitchLimit,Math.min(orbitPitchLimit,view.pitch));
+	return [Math.sin(view.yaw)*Math.cos(pitch)*view.distance,Math.sin(pitch)*view.distance,Math.cos(view.yaw)*Math.cos(pitch)*view.distance].map((value,axis)=>value+center[axis]);
 }
