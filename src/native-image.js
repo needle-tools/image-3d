@@ -1,6 +1,9 @@
+import {inputActions} from './input-actions.js';
+
 const state=globalThis[Symbol.for('needle.img-3d.native.v1')]??={records:new WeakMap()};
 const records=state.records;
 const set=(style,key,value)=>{if(style[key]!==value)style[key]=value;};
+const controls=['hover-controls',...Object.keys(inputActions)].map(name=>[name,'data-'+name]);
 /** A native image remains the layout anchor and fallback; its renderer is a sibling. */
 export function enhanceImage(target){
  const image=target.localName==='picture'?target.querySelector('img'):target;
@@ -13,6 +16,7 @@ export function enhanceImage(target){
  else if(positionOwned)container.style.position='relative';
  image.setAttribute('data-img3d-poster','');renderer.setAttribute('data-img3d-overlay','');renderer.style.cssText='position:absolute;display:block;min-width:0;min-height:0;margin:0;visibility:hidden';container.append(renderer);
  let disconnected=false,orbitFit=null,autoRotate=null,environment=null;
+ const appliedControls=new Map();
  const fallback=()=>{renderer.style.visibility='hidden';image.style.visibility=original.visibility;};
  const loaded=()=>{if(disconnected)return;image.style.visibility='hidden';renderer.style.visibility='visible';};
  const update=()=>{
@@ -27,13 +31,19 @@ export function enhanceImage(target){
   if(rotation!==autoRotate){autoRotate=rotation;if(rotation===null)renderer.removeAttribute('auto-rotate');else renderer.setAttribute('auto-rotate',rotation);}
   const lighting=(container.localName==='picture'?container.getAttribute('data-environment'):null)??image.getAttribute('data-environment');
   if(lighting!==environment){environment=lighting;if(lighting===null)renderer.removeAttribute('environment');else renderer.setAttribute('environment',lighting);}
+  for(const [name,attribute] of controls){
+   const value=(container.localName==='picture'?container.getAttribute(attribute):null)??image.getAttribute(attribute);
+   if(value===(appliedControls.get(name)??null))continue;
+   appliedControls.set(name,value);
+   if(value===null)renderer.removeAttribute(name);else renderer.setAttribute(name,value);
+  }
   if(!image.complete||!image.naturalWidth)return;
   // The native image owns candidate selection, including cached higher resolutions.
   const src=image.currentSrc||image.src;if(src&&renderer.src!==src)renderer.src=src;
  };
  renderer.addEventListener('load',loaded);renderer.addEventListener('error',fallback);image.addEventListener('load',update);image.addEventListener('error',fallback);
  const resize=new ResizeObserver(update);resize.observe(image);resize.observe(container);
- const mutation=new MutationObserver(entries=>{if(entries.some(e=>e.target!==renderer))update();});mutation.observe(container,{attributes:true,subtree:true,attributeFilter:['src','srcset','sizes','media','type','width','height','alt','title','class','style','data-orbit-fit','data-auto-rotate','data-environment']});
+ const mutation=new MutationObserver(entries=>{if(entries.some(e=>e.target!==renderer))update();});mutation.observe(container,{attributes:true,subtree:true,attributeFilter:['src','srcset','sizes','media','type','width','height','alt','title','class','style','data-orbit-fit','data-auto-rotate','data-environment',...controls.map(([,attribute])=>attribute)]});
  const refresh=()=>requestAnimationFrame(update);addEventListener('resize',refresh);
  const record={image,element:renderer,disconnect(detached=false){if(disconnected)return;disconnected=true;resize.disconnect();mutation.disconnect();removeEventListener('resize',refresh);image.removeEventListener('load',update);image.removeEventListener('error',fallback);renderer.remove();image.removeAttribute('data-img3d-poster');image.style.visibility=original.visibility;if(owned&&image.style.width==='100%')image.style.width=original.width;if(owned){if(!detached&&image.isConnected){container.before(image);container.remove();}else if(!container.contains(image))container.remove();}else if(positionOwned&&container.style.position==='relative')container.style.position=original.position;if(!detached){image.removeAttribute('data-img-3d');container.removeAttribute('data-img-3d');}records.delete(image);}};
  records.set(image,record);update();return record;

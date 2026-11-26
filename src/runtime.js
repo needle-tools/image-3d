@@ -1,6 +1,9 @@
 import {sceneInstance,sceneHitTest} from './scene-camera.js';
-import {cameraPose,createCameraMotion} from './camera-motion.js';
-import {boundsFrame,orbitEye,orbitPitchLimit} from './bounds-fit.js';
+import {cameraPose,createCameraMotion,wrapAngle} from './camera-motion.js';
+import {createHoverControls} from './hover-controls.js';
+import {inputAction,inputActions,setInputAction} from './input-actions.js';
+import {boundsFrame,cameraFocal,orbitPitchLimit} from './bounds-fit.js';
+import {orbitFrame,localLighting,identityRotation} from './view-rotation.js';
 import {enhanceImage,installNativeImages} from './native-image.js';
 export {enhanceImage};
 import {captureBytes} from './container.js';
@@ -54,6 +57,7 @@ uniform vec4 studioLights[6],environmentParams;
 #endif
 uniform vec3 lightDirection;
 uniform float lightIntensity, ambientIntensity;
+uniform mat3 modelRotation;
 uniform float size, cutoff;
 uniform bool emission, blended;
 flat in int id;
@@ -250,7 +254,7 @@ void main(){
  float k=pow(rough+1.,2.)/8.,g=nv/(nv*(1.-k)+k)*nl/(nl*(1.-k)+k);
  vec3 f0=mix(vec3(.04),base,metal),F=f0+(1.-f0)*pow(1.-vh,5.);
  vec3 diffuse=base*(1.-metal);
- vec3 ambient=mix(vec3(.16,.19,.25),vec3(.68,.73,.8),N.y*.5+.5);
+ vec3 ambient=mix(vec3(.16,.19,.25),vec3(.68,.73,.8),(modelRotation*N).y*.5+.5);
  vec3 color=ambient*ambientIntensity*(diffuse+f0*.5)*clamp(channel(hitUv,3)/coverage,0.,1.)+(diffuse/3.141593+F*d*g/max(4.*nv*nl,.001))*nl*lightIntensity;
  if(emission)color+=texture(colorMap,vec2((hitUv.x+1.)*.5,hitUv.y)).rgb/coverage;
  outputColor=vec4(srgb(color/(1.+color)),blended?texture(geometryMap,vec2((hitUv.x+1.)*.5,hitUv.y)).r:1.);
@@ -266,7 +270,6 @@ void main(){
 }`;
 
 const cross = (a,b) => [a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
-const unit = v => { const n=Math.hypot(...v); return v.map(x=>x/n); };
 const numbers=(v,n)=>Array.isArray(v)&&v.length===n&&v.every(Number.isFinite);
 
 // One hidden WebGL surface supplies ordinary 2D canvases. Browser compositing
@@ -277,6 +280,8 @@ const integration=globalThis[Symbol.for('needle.img-3d.v1')]??= {};
 /** Optional trusted XUASTC entry; capture files never supply executable code. */
 export function registerImg3dDecoder(decoder){integration.decoder??=decoder;}
 const cameraMotion=createCameraMotion(el=>enqueue(el));
+const defaultCamera={yaw:.55,pitch:.2,distance:4};
+const actionAttributes=Object.keys(inputActions);
 let studioLighting;
 function loadStudioLighting(){
  return studioLighting??=fetch(new URL('./studio.json.gz',import.meta.url)).then(async response=>{
@@ -485,7 +490,7 @@ function program(key){if(programs.has(key))return programs.get(key);
   gl.attachShader(p,shader);gl.deleteShader(shader);
  }
  gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS)){const message=gl.getProgramInfoLog(p);gl.deleteProgram(p);throw Error(message);}
- const locations={};for(const name of ['eye','right','up','forward','aspect','focal','frameTransform','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','studioMap','studioLights','environmentParams','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin','image','area','shadowMap','inverseCamera','shadowEye','shadowBounds','shadowParams'])locations[name]=gl.getUniformLocation(p,name);
+ const locations={};for(const name of ['eye','right','up','forward','aspect','focal','frameTransform','offset','boxes','colorMap','geometryMap','shadingMap','size','cutoff','emission','blended','lightDirection','lightIntensity','ambientIntensity','modelRotation','studioMap','studioLights','environmentParams','hitMap','hitDepth','batchId','cacheInput','cacheOutput','origin','image','area','shadowMap','inverseCamera','shadowEye','shadowBounds','shadowParams'])locations[name]=gl.getUniformLocation(p,name);
  const result={program:p,locations};programs.set(key,result);return result;
 }
 function dropSurface(el){
@@ -493,9 +498,9 @@ function dropSurface(el){
  const cache=el.surfaceCache;el.surfacePose=null;if(!cache)return;
  gl?.deleteFramebuffer(cache.framebuffer);for(const texture of cache.textures)gl?.deleteTexture(texture);el.surfaceCache=null;
 }
-function surfaceCache(el,asset,w,h,opaque){
+function surfaceCache(el,asset,w,h,opaque,view){
  if(!canCache||asset.data.appearance==='baked'||!opaque.length)return null;
- const camera=cameraPose(el),key=[epoch,camera.yaw,camera.pitch,camera.distance,w,h,...el.layoutSignature].join(',');
+ const camera=cameraPose(el),key=[epoch,camera.yaw,camera.pitch,camera.distance,w,h,...el.layoutSignature,...(el.modelLook??[])].join(',');
  let cache=el.surfaceCache;
  if(cache&&(cache.asset!==asset||cache.w!==w||cache.h!==h)){dropSurface(el);cache=null;}
  const stable=el.surfacePose===key;el.surfacePose=key;
@@ -515,21 +520,20 @@ function surfaceCache(el,asset,w,h,opaque){
   if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){dropSurface(el);canCache=false;gl.bindFramebuffer(gl.FRAMEBUFFER,null);return null;}
  }
  gl.bindFramebuffer(gl.FRAMEBUFFER,cache.framebuffer);cache.key=key;
- clear(w,h);draw(el,asset,opaque,w,h,'cache');surfaceBuilds++;return cache;
+ clear(w,h);draw(el,asset,opaque,w,h,'cache',null,view);surfaceBuilds++;return cache;
 }
 function clear(w,h,x=0,y=0){gl.viewport(x,y,w,h);gl.enable(gl.SCISSOR_TEST);gl.scissor(x,y,w,h);gl.clearColor(0,0,0,0);gl.depthMask(true);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);}
-function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
+function draw(el,asset,batches,w,h,mode,cache,{eye,forward,right,up,rotation},x=0,y=0){
  // Compile cache writes separately so forward PBR does not carry their branch.
- const light=el.lighting,studio=mode!=='baked'&&mode!=='cache'&&enhanced(light),key=studio?'studio'+(light.lights?.length?3:0):['baked','cache','reuse'].includes(mode)?mode:'pbr';
+ const light=localLighting(el.lighting,rotation),studio=mode!=='baked'&&mode!=='cache'&&enhanced(light),key=studio?'studio'+(light.lights?.length?3:0):['baked','cache','reuse'].includes(mode)?mode:'pbr';
  const {program:p,locations:u}=program(key);
- const camera=cameraPose(el),center=el.boundsFit?.center??[0,0,0],eye=orbitEye(camera,center);
- const forward=unit(eye.map((x,k)=>center[k]-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward);
  gl.useProgram(p);for(const [name,v]of Object.entries({eye,right,up,forward}))gl.uniform3fv(u[name],v);
  if(mode!=='baked'){
-  const light=el.lighting;gl.uniform3fv(u.lightDirection,light.direction);gl.uniform1f(u.lightIntensity,light.intensity);gl.uniform1f(u.ambientIntensity,light.ambient);
+  gl.uniform3fv(u.lightDirection,light.direction);gl.uniform1f(u.lightIntensity,light.intensity);gl.uniform1f(u.ambientIntensity,light.ambient);
+  gl.uniformMatrix3fv(u.modelRotation,false,rotation??identityRotation);
  }
  gl.uniform1i(u.cacheInput,mode==='reuse');gl.uniform1i(u.cacheOutput,mode==='cache');gl.uniform2i(u.origin,x,y);
- gl.uniform1f(u.aspect,el.frameRatio);gl.uniform1f(u.focal,2.41421356);gl.uniform4f(u.frameTransform,el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy);
+ gl.uniform1f(u.aspect,el.frameRatio);gl.uniform1f(u.focal,cameraFocal);gl.uniform4f(u.frameTransform,el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy);
  const bind=(texture,slot,name)=>{gl.activeTexture(gl.TEXTURE0+slot);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(u[name],slot);};
  if(studio){const values=studioUniforms(light);gl.uniform4fv(u.studioLights,values.subarray(0,24));gl.uniform4fv(u.environmentParams,values.subarray(24));bind(studioTexture(light.environment),6,'studioMap');}
  bind(cache?.textures[0]??asset.textures[0],4,'hitMap');bind(cache?.textures[1]??asset.textures[0],5,'hitDepth');
@@ -546,13 +550,13 @@ function draw(el,asset,batches,w,h,mode,cache,x=0,y=0){
 }
 function present(el,asset,{x,y,w,h}){
  viewRenders++;
- const camera=cameraPose(el),eye=orbitEye(camera,el.boundsFit?.center),opaque=[],transparent=[];
+ const view=orbitFrame(cameraPose(el),el.boundsFit?.center,el.modelLook),{eye}=view,opaque=[],transparent=[];
  for(const batch of asset.batches){if(!batch.blend)opaque.push([batch,0,batch.boxes.length]);else batch.boxes.forEach((box,i)=>transparent.push([batch,i,1,box.c.reduce((s,x,k)=>s+(x-eye[k])**2,0)]));}
  transparent.sort((a,b)=>b[3]-a[3]);
- const cache=surfaceCache(el,asset,w,h,opaque);
+ const cache=surfaceCache(el,asset,w,h,opaque,view);
  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
- clear(w,h,x,y);draw(el,asset,opaque,w,h,asset.data.appearance==='baked'?'baked':cache?'reuse':'pbr',cache,x,y);
- if(transparent.length)draw(el,asset,transparent,w,h,asset.data.appearance==='baked'?'baked':'pbr',null,x,y);
+ clear(w,h,x,y);draw(el,asset,opaque,w,h,asset.data.appearance==='baked'?'baked':cache?'reuse':'pbr',cache,view,x,y);
+ if(transparent.length)draw(el,asset,transparent,w,h,asset.data.appearance==='baked'?'baked':'pbr',null,view,x,y);
 }
 function copy(el,{x,y,w,h}){
  if(el.canvas.width!==w||el.canvas.height!==h){el.canvas.width=w;el.canvas.height=h;}
@@ -590,7 +594,7 @@ function resolveLive(finished){
 // Explicit draw() still refreshes the canvas for immediate pixel readback.
 function viewState(el,asset,w,h){
  const light=el.lighting,camera=cameraPose(el);
- return[asset,el.generation,api??gl,epoch,el.canvas,w,h,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,el.groundShadow,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
+ return[asset,el.generation,api??gl,epoch,el.canvas,w,h,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,el.groundShadow,el.modelLook?.[0]??0,el.modelLook?.[1]??0,...(asset.data.appearance==='baked'?[]:[...lightingState(light)])];
 }
 function sameView(el,state){const old=lastRendered.get(el);return old?.length===state.length&&state.every((value,i)=>Object.is(value,old[i]));}
 function dimensions(el){const camera=cameraPose(el),ratio=Math.min(devicePixelRatio||1,2),style=getComputedStyle(el),[w,h]=contentSize(el,style),key=[w,h,style.objectFit,style.objectPosition,el.orbitFit,el.frameRatio,el.naturalWidth,el.metadata,...(el.metadata?.frame??el.data?.display?.frame??[]),...(el.metadata?.support&&el.orbitFit!=='fixed'?[camera.yaw,camera.pitch]:[])];if(!el.layoutKey||key.some((v,i)=>v!==el.layoutKey[i])){el.layoutKey=key;el.layout=frameLayout(el,w,h,style);el.layoutSignature=[el.layout.sx,el.layout.sy,el.layout.cx,el.layout.cy,el.frameRatio];}return[Math.max(1,Math.round(w*ratio)),Math.max(1,Math.round(h*ratio))];}
@@ -616,7 +620,7 @@ function layout(){
   if(!job.ready)continue;
   const [w,h]=dimensions(el);
   if(!job.force&&job.asset&&!job.error&&sameView(el,viewState(el,job.asset,w,h))){pending.delete(el);job.resolve(false);continue;}
-  const camera=cameraPose(el),key=JSON.stringify([el.url,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,w,h,el.groundShadow,job.asset?.data.appearance==='baked'?null:lightingState(el.lighting)]),region=regions.get(key);
+  const camera=cameraPose(el),key=JSON.stringify([el.url,...el.layoutSignature,camera.yaw,camera.pitch,camera.distance,w,h,el.groundShadow,el.modelLook,job.asset?.data.appearance==='baked'?null:lightingState(el.lighting)]),region=regions.get(key);
   if(region){views.push({el,job,key,...region});continue;}
   if(x&&x+w>Math.max(limit,w)){x=0;y+=row;row=0;}
   if(views.length&&y+h>limit)break;
@@ -785,7 +789,10 @@ export async function createImg3dScene(canvas,{lighting,signal,onDeviceLost}={})
 }
 /** A static box capture. Many elements share one context and bounded caches. */
 export class Img3d extends HTMLElement {
- static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit','auto-rotate','environment','data-environment'];
+ #hoverControls;
+ #hoverOptions;
+ #hoverLighting;
+ static observedAttributes=['src','srcset','width','height','alt','aria-label','style','class','orbit-fit','data-orbit-fit','auto-rotate','environment','data-environment','hover-controls',...actionAttributes];
  static get statistics(){
   const active=activeUrls(),idleGpu=inactive(gpu,active),idleCpu=inactive(cpu,active),inactiveTextureBytes=bytes(idleGpu),inactiveCachedBytes=bytes(idleCpu),textureBytes=bytes(gpu),cachedBytes=bytes(cpu);
   return {sceneCount:scenes.size,sceneRenders,backend:api?'webgpu':gl?'webgl2':null,adapter:api?.adapter??null,devices:api?1:0,canvasContexts:[...elements].filter(el=>el.gpuContext).length+(api?.sceneContexts??0),attachmentBytes:api?.attachmentBytes??0,environmentBytes:api?.environmentBytes??[...studioTextures.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0),validationErrors:api?.validationErrors??0,surfaceCaches:[...elements].filter(el=>el.surfaceCache).length,surfaceBytes:[...elements].reduce((sum,el)=>sum+(el.surfaceCache?.bytes||0),0),surfaceBuilds,surfaceReuses,viewRenders,contexts,assets:gpu.size,textureBytes,cachedBytes,activeAssets:gpu.size-idleGpu.size,inactiveAssets:idleGpu.size,activeTextureBytes:textureBytes-inactiveTextureBytes,inactiveTextureBytes,activeCachedBytes:cachedBytes-inactiveCachedBytes,inactiveCachedBytes,renders,decodes,pending:pending.size,fetching,...limits};
@@ -793,7 +800,12 @@ export class Img3d extends HTMLElement {
  get textureBytes(){return gpu.get(this.url)?.bytes??0;}
  get textureFormat(){return gpu.get(this.url)?.textureFormat??null;}
  get transcodeMilliseconds(){return gpu.get(this.url)?.transcodeMilliseconds??0;}
- get lighting(){return this.light??this.studioLight??{direction:[-.6,1,1],intensity:2.5,ambient:1};}
+ get lighting(){
+  const light=this.light??this.studioLight??{direction:[-.6,1,1],intensity:2.5,ambient:1};
+  if(!light.environment||!this.#hoverLighting)return light;
+  const [rotation,pitch]=this.#hoverLighting;
+  return {...light,environmentRotation:wrapAngle(light.environmentRotation+rotation),environmentPitch:light.environmentPitch+pitch};
+ }
  set lighting(value){
   const previous=this.lighting.environment;this.light=value==null?undefined:normalizeLighting(value);if(previous!==this.lighting.environment)trimCaches();
   enqueue(this);
@@ -817,6 +829,16 @@ export class Img3d extends HTMLElement {
  get srcset(){return this.getAttribute('srcset')??'';}
  set srcset(value){if(this.srcset!==value)this.setAttribute('srcset',value);}
  get currentSrc(){return this.url??'';}
+ get hoverControls(){return this.hasAttribute('hover-controls');}
+ set hoverControls(enabled){this.toggleAttribute('hover-controls',enabled);}
+ get hoverAction(){return inputAction(this,'hover-action');}
+ set hoverAction(value){setInputAction(this,'hover-action',value);}
+ get mouseDragAction(){return inputAction(this,'mouse-drag-action');}
+ set mouseDragAction(value){setInputAction(this,'mouse-drag-action',value);}
+ get touchDragAction(){return inputAction(this,'touch-drag-action');}
+ set touchDragAction(value){setInputAction(this,'touch-drag-action',value);}
+ get touchPinchAction(){return inputAction(this,'touch-pinch-action');}
+ set touchPinchAction(value){setInputAction(this,'touch-pinch-action',value);}
  get orbitFit(){return(this.getAttribute('data-orbit-fit')??this.getAttribute('orbit-fit'))==='auto'?'auto':'fixed';}
  set orbitFit(value){const mode=value==='auto'?'auto':'fixed';if(this.getAttribute('data-orbit-fit')!==mode)this.setAttribute('data-orbit-fit',mode);}
  get naturalWidth(){return this.metadata?.width??this.data?.display?.width??(this.data?300:0);}
@@ -831,14 +853,62 @@ export class Img3d extends HTMLElement {
  /** Establish a fixed camera from reconstructed bounds; no fitting runs while orbiting. */
  fitToBounds({aspect=this.clientWidth/this.clientHeight,fov=30,padding=1.1}={}){
   this.boundsFit=boundsFrame(this.metadata?.support??this.data?.display?.support,{aspect,fov,padding});
-  this.distance=this.boundsFit.distance;this.layoutKey=null;cameraMotion.stop(this);enqueue(this);
+  this.distance=this.boundsFit.distance;this.layoutKey=null;cameraMotion.stop(this);this.#hoverControls?.syncPose();enqueue(this);
   return this.distance;
+ }
+ /** Enable hover controls with a custom interaction surface or activation timing. */
+ attachHoverControls(options={}){
+  const config={...options};
+  this.#hoverOptions=config;
+  if(this.hoverControls)this.#syncHoverControls();else this.hoverControls=true;
+  return ()=>{if(this.#hoverOptions===config)this.hoverControls=false;};
+ }
+ #stopHoverControls(){
+  this.#hoverControls?.disconnect();
+  this.#hoverControls=undefined;
+  this.#hoverLighting=undefined;
+  this.modelLook=undefined;
+ }
+ #usesCustomControls(){return this.hoverControls||actionAttributes.some(name=>this.hasAttribute(name)&&inputAction(this,name)!==inputActions[name].standard);}
+ #syncHoverControls(){
+  const config=this.#hoverOptions,previous=this.#hoverControls;
+  if(!this.#usesCustomControls()){
+   if(!previous)return;
+   this.#stopHoverControls();
+  }else{
+   if(!config&&(!this.isConnected||!this.poseStarted))return;
+   const {hoverAction,mouseDragAction,touchDragAction,touchPinchAction}=this;
+   const returnToRest=this.hoverControls||hoverAction!=='none';
+   const key=[hoverAction,mouseDragAction,touchDragAction,touchPinchAction,returnToRest].join(' ');
+   if(previous?.config===config&&previous?.key===key)return;
+   this.#stopHoverControls();
+   this.#bindHoverControls(config,{hoverAction,mouseDragAction,touchDragAction,touchPinchAction,returnToRest},key);
+  }
+  this.syncSizing();
+  this.syncAutoRotation();
+  if(previous)enqueue(this);
+ }
+ #bindHoverControls(config,actions,key){
+  const {target=this,rest={yaw:this.yaw,pitch:this.pitch},initialPointer,viewportTilt=false,
+   entryDelayMs=0,returnDelayMs=5000,returnDurationMs=4000}=config??{};
+  cameraMotion.stop(this);this.pointer=null;
+  this.#hoverControls={...createHoverControls(this,{target,rest,initialPointer,viewportTilt,entryDelayMs,returnDelayMs,returnDurationMs,...actions},
+   cameraMotion,(yaw,pitch,distance,rotation,lightPitch,look)=>{
+    const light=this.#hoverLighting;
+    const lightChanged=rotation!==(light?.[0]??0)||lightPitch!==(light?.[1]??0);
+    const lookChanged=this.modelLook?.[0]!==look?.[0]||this.modelLook?.[1]!==look?.[1];
+    if(this.yaw===yaw&&this.pitch===pitch&&this.distance===distance&&!lightChanged&&!lookChanged)return;
+    this.yaw=yaw;this.pitch=pitch;this.distance=distance;
+    if(lightChanged)this.#hoverLighting=rotation||lightPitch?[rotation,lightPitch]:undefined;
+    if(lookChanged)this.modelLook=look;
+    enqueue(this);
+   },()=> (this.light??this.studioLight)?.environmentPitch??0),config,key};
  }
  syncAutoRotation(){
   const attribute=this.getAttribute('auto-rotate');
   const speed=attribute===null ? 0 : attribute.trim()==='' ? 0.3 : Number(attribute);
   const active=this.isConnected&&this.visible&&!document.hidden&&!reducedMotion.matches&&
-   !this.autoRotationInterrupted&&this.loadedGeneration===this.generation;
+   !this.#usesCustomControls()&&!this.autoRotationInterrupted&&this.loadedGeneration===this.generation;
   cameraMotion.rotate(this,active&&Number.isFinite(speed)?speed:0);
  }
  stopAutoRotation(){
@@ -849,7 +919,20 @@ export class Img3d extends HTMLElement {
  syncSizing(){
   for(const name of ['width','height']){const n=Number(this.getAttribute(name)),value=n>0?n+'px':'';if(this.style.getPropertyValue('--img3d-'+name)!==value){if(value)this.style.setProperty('--img3d-'+name,value);else this.style.removeProperty('--img3d-'+name);}}
   const ratio=String(this.frameRatio);if(this.style.getPropertyValue('--img3d-ratio')!==ratio)this.style.setProperty('--img3d-ratio',ratio);
-  const alt=this.alt||this.getAttribute('aria-label');this.canvas.setAttribute('aria-label',(alt?alt+'. ':'3D model. ')+'Drag or arrow keys rotate; plus and minus zoom; Home resets.');
+  const alt=this.alt||this.getAttribute('aria-label');
+  let controls='Drag or arrow keys rotate; plus and minus zoom; Home resets.';
+  if(this.#usesCustomControls()){
+   const hints=[];
+   if(this.hoverAction==='orbit'||this.hoverAction==='orbit-relative')hints.push('Move the pointer to orbit.');
+   if(this.hoverAction==='look-at')hints.push('The model turns toward the pointer.');
+   if(this.mouseDragAction==='orbit-environment')hints.push('Drag with a mouse to rotate the lighting.');
+   if(this.mouseDragAction==='orbit')hints.push('Drag with a mouse to orbit.');
+   if(this.touchDragAction==='orbit-environment')hints.push('Swipe sideways to rotate the lighting.');
+   if(this.touchDragAction==='orbit')hints.push('Swipe sideways to orbit.');
+   if(this.touchPinchAction==='zoom-model')hints.push('Pinch to zoom the model.');
+   controls=[...hints,'Arrow keys rotate. Plus and minus zoom. Home resets.'].join(' ');
+  }
+  this.canvas.setAttribute('aria-label',(alt?alt+'. ':'3D model. ')+controls);
  }
  pickSource(ready=false){if(!this.srcset)return this.src?new URL(this.src,this.baseURI).href:'';if(!ready)dimensions(this);const selected=chooseSource(this.srcset,this.src,this.layout.width*4/cameraPose(this).distance,Math.min(devicePixelRatio||1,2),this.url,this.baseURI);return selected?new URL(selected,this.baseURI).href:'';}
 
@@ -859,10 +942,10 @@ export class Img3d extends HTMLElement {
   this.canvas=this.shadowRoot.querySelector('canvas');this.status=this.shadowRoot.querySelector('span');this.reset();
   this.addEventListener('load',()=>this.syncAutoRotation());
   this.canvas.onfocus=()=>this.stopAutoRotation();
-  this.canvas.onpointerdown=e=>{this.stopAutoRotation();if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}const pose=cameraPose(this);Object.assign(this,{yaw:pose.yaw,pitch:pose.pitch,distance:pose.distance});cameraMotion.stop(this);this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
+  this.canvas.onpointerdown=e=>{if(this.#usesCustomControls())return;this.stopAutoRotation();if(e.pointerType!=='touch'){e.preventDefault();this.canvas.focus({preventScroll:true});}const pose=cameraPose(this);Object.assign(this,{yaw:pose.yaw,pitch:pose.pitch,distance:pose.distance});cameraMotion.stop(this);this.pointer=[e.clientX,e.clientY,e.pointerType];this.canvas.setPointerCapture(e.pointerId);};
   this.canvas.onpointermove=e=>{if(!this.pointer)return;if(this.pointer[2]==='touch'&&Math.abs(e.clientY-this.pointer[1])>Math.abs(e.clientX-this.pointer[0]))return;cameraMotion.hold(this);this.yaw-=(e.clientX-this.pointer[0])*.01;this.pitch=Math.max(-orbitPitchLimit,Math.min(orbitPitchLimit,this.pitch+(e.clientY-this.pointer[1])*.01));this.pointer=[e.clientX,e.clientY,e.pointerType];cameraMotion.to(this);};
   this.canvas.onpointerup=this.canvas.onpointercancel=()=>{this.pointer=null;};
-  this.canvas.onwheel=e=>{if(!e.altKey)return;this.stopAutoRotation();e.preventDefault();this.distance=Math.max(1.8,Math.min(15,this.distance*Math.exp(e.deltaY*.001)));enqueue(this);};
+  this.canvas.onwheel=e=>{if(!e.altKey)return;this.stopAutoRotation();e.preventDefault();this.distance=Math.max(1.8,Math.min(15,this.distance*Math.exp(e.deltaY*.001)));this.#hoverControls?.syncPose();enqueue(this);};
   this.canvas.ondblclick=()=>this.reset();
   this.canvas.onkeydown=e=>{
    if(!['Home','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','+','=','-'].includes(e.key))return;
@@ -870,10 +953,11 @@ export class Img3d extends HTMLElement {
    if(e.key==='Home')this.reset();else if(e.key==='ArrowLeft')this.yaw-=.1;else if(e.key==='ArrowRight')this.yaw+=.1;
    else if(e.key==='ArrowUp')this.pitch=Math.min(orbitPitchLimit,this.pitch+.1);else if(e.key==='ArrowDown')this.pitch=Math.max(-orbitPitchLimit,this.pitch-.1);
    else if(e.key==='+'||e.key==='=')this.distance=Math.max(1.8,this.distance*.9);else if(e.key==='-')this.distance=Math.min(15,this.distance/.9);else return;
+   if(e.key!=='Home')this.#hoverControls?.syncPose();
    e.preventDefault();enqueue(this);
   };
  }
- reset(){cameraMotion.stop(this);this.yaw=.55;this.pitch=.2;this.distance=4;enqueue(this);}
+ reset(){if(this.#hoverControls){this.#hoverControls.reset();return;}cameraMotion.stop(this);Object.assign(this,defaultCamera);enqueue(this);}
  // A canvas bound to a lost WebGPU device cannot take a 2D context; a fresh one
  // with the same handlers serves the WebGL fallback.
  replaceCanvas(){
@@ -881,9 +965,9 @@ export class Img3d extends HTMLElement {
   for(const name of ['onfocus','onpointerdown','onpointermove','onpointerup','onpointercancel','onwheel','ondblclick','onkeydown'])next[name]=old[name];
   old.replaceWith(next);this.canvas=next;this.gpuContext=this.gpuDevice=null;
  }
- connectedCallback(){elements.add(this);this.syncSizing();this.syncStudioLighting();resize.observe(this);intersection.observe(this);this.load();}
- disconnectedCallback(){elements.delete(this);resize.unobserve(this);intersection.unobserve(this);this.visible=false;this.release();if(!elements.size)clearCaches();}
- attributeChangedCallback(name){if(!this.isConnected)return;if(name==='auto-rotate'){this.autoRotationInterrupted=false;this.syncAutoRotation();return;}if(name==='environment'||name==='data-environment'){this.syncStudioLighting();return;}if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;this.syncAutoRotation();}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
+ connectedCallback(){elements.add(this);this.#syncHoverControls();this.syncSizing();this.syncStudioLighting();resize.observe(this);intersection.observe(this);this.load();}
+ disconnectedCallback(){this.#stopHoverControls();if(this.#hoverOptions)this.hoverControls=false;elements.delete(this);resize.unobserve(this);intersection.unobserve(this);this.visible=false;this.release();if(!elements.size)clearCaches();}
+ attributeChangedCallback(name){if(name==='hover-controls'||actionAttributes.includes(name)){if(name==='hover-controls'&&!this.hoverControls)this.#hoverOptions=undefined;this.#syncHoverControls();return;}if(!this.isConnected)return;if(name==='auto-rotate'){this.autoRotationInterrupted=false;this.syncAutoRotation();return;}if(name==='environment'||name==='data-environment'){this.syncStudioLighting();return;}if(name==='src'||name==='srcset'){this.failedSource=null;this.generation++;this.abort?.abort();cancel(this);this.loadingUrl=null;this.reloadSource=true;this.syncAutoRotation();}if(name==='width'||name==='height'||name==='alt'||name==='aria-label')this.syncSizing();this.load();}
  release(){cameraMotion.rotate(this,0);cameraMotion.stop(this);this.boundsFit=null;this.loadingUrl=null;this.metadata=null;this.generation++;this.abort?.abort();cancel(this);dropSurface(this);this.data=null;this.pointer=null;if(this.canvas)blank(this);trimCaches();}
  async load(){
   if(!this.isConnected||!this.visible)return false;
@@ -901,9 +985,16 @@ export class Img3d extends HTMLElement {
     if(adaptive&&this.pickSource()!==url)return enqueue(this);
     cancel(this);generation=++this.generation;this.adaptiveLoad=false;dropSurface(this);this.metadata=asset.data.display??{width:300,height:300};this.url=url;
     const initial=!this.poseStarted;this.poseStarted=true;
-    if(initial&&!this.skipIntro)cameraMotion.hold(this,{yaw:.55,pitch:.2,distance:4,...asset.data.display?.camera});
+    if(initial&&!this.skipIntro&&!this.#hoverOptions){
+     const poster={...defaultCamera,...asset.data.display?.camera};
+     if(this.#usesCustomControls()){
+      // Use the poster pose for the first hover frame without replacing a camera set by the caller.
+      for(const axis of Object.keys(defaultCamera))if(this[axis]===defaultCamera[axis])this[axis]=poster[axis];
+     }else cameraMotion.hold(this,poster);
+    }
+    this.#syncHoverControls();
     this.syncSizing();const shown=await enqueue(this);
-    if(initial&&shown&&!this.skipIntro)cameraMotion.to(this,300);
+    if(initial&&shown&&!this.skipIntro&&!this.#hoverControls)cameraMotion.to(this,300);
     return shown;
    }catch(error){if(generation===this.generation&&!this.abort.signal.aborted&&error?.name!=='AbortError'){this.failedSource=url;if(adaptive){this.status.textContent='';this.dispatchEvent(new CustomEvent('error',{detail:error}));}else{this.url=null;this.metadata=null;dropSurface(this);this.fail(error);}}return false;}
    finally{if(generation===this.generation){this.loadingUrl=null;this.adaptiveLoad=false;trimCaches();}}
@@ -912,6 +1003,7 @@ export class Img3d extends HTMLElement {
  fail(error){cameraMotion.rotate(this,0);cameraMotion.stop(this);this.data=null;this.loadedGeneration=-1;blank(this);const asset=gpu.get(this.url);if(asset)lastRendered.set(this,viewState(this,asset,...dimensions(this)));this.status.textContent=error.message;this.dispatchEvent(new CustomEvent('error',{detail:error}));}
  draw(){
   this.skipIntro=true;cameraMotion.stop(this);
+  this.#hoverControls?.syncPose();
   // A load event can change camera settings before its first enqueue completes.
   // Explicit draw must present those new settings, not return that earlier frame.
   return this.loadingUrl&&!this.adaptiveLoad?this.loadTask.then(shown=>shown?enqueue(this,true):false):enqueue(this,true);

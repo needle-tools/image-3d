@@ -1,4 +1,4 @@
-const FOCAL=2.41421356;
+export const cameraFocal=2.41421356;
 
 /** Match a padded bounding-sphere camera without retaining the authored poster crop. */
 export function boundsFrame(points,{aspect,fov=30,padding=1.1}={}){
@@ -11,7 +11,7 @@ export function boundsFrame(points,{aspect,fov=30,padding=1.1}={}){
 	const radius=Math.hypot(...max.map((value,axis)=>value-min[axis]))/2;
 	if(!radius)throw Error('Capture has empty surface bounds');
 	const vertical=fov*Math.PI/360,horizontal=Math.atan(Math.tan(vertical)*aspect);
-	const crop=FOCAL*Math.tan(vertical);
+	const crop=cameraFocal*Math.tan(vertical);
 	return {
 		aspect,center:min.map((value,axis)=>(value+max[axis])/2),
 		distance:radius/Math.sin(Math.min(vertical,horizontal))*padding,

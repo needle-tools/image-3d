@@ -8,6 +8,20 @@ export declare class Img3d extends HTMLElement {
   /** Candidate widths are converter-measured usable frame pixels, not atlas sizes. */
   srcset: string;
   readonly currentSrc: string;
+  /** Reflects hover-controls. Enable hover orbit, mouse drag for lighting, and touch orbit and pinch. */
+  hoverControls: boolean;
+  /** Hover interaction. Set to null to restore the active preset's default. */
+  get hoverAction(): Img3dHoverAction;
+  set hoverAction(value: Img3dHoverAction | null);
+  /** Mouse drag interaction. Set to null to restore the active preset's default. */
+  get mouseDragAction(): Img3dDragAction;
+  set mouseDragAction(value: Img3dDragAction | null);
+  /** One-finger drag interaction. Vertical page scrolling remains native. */
+  get touchDragAction(): Img3dDragAction;
+  set touchDragAction(value: Img3dDragAction | null);
+  /** Route pinch zoom to the browser or the model. */
+  get touchPinchAction(): Img3dTouchPinchAction;
+  set touchPinchAction(value: Img3dTouchPinchAction | null);
   /** Reflects data-orbit-fit: keep capture framing fixed by default, or opt into auto framing to avoid clipping during orbit. */
   orbitFit: 'auto' | 'fixed';
   readonly naturalWidth: number;
@@ -30,10 +44,31 @@ export declare class Img3d extends HTMLElement {
   distance: number;
   /** After load, establish fixed padded framing from captured surface bounds. Does not refit during orbit. */
   fitToBounds(options?: {aspect?:number;fov?:number;padding?:number}): number;
+  /** Enable hover controls with custom options. Returns a function that disables this attachment. */
+  attachHoverControls(options?: Img3dHoverOptions): () => void;
   /** Apply the requested pose immediately, finish camera easing, and allow canvas readback. */
   draw(): Promise<boolean>;
   /** Restore the initial orbit and zoom. */
   reset(): void;
+}
+export type Img3dHoverAction = 'none' | 'orbit' | 'orbit-relative' | 'look-at';
+export type Img3dDragAction = 'none' | 'orbit' | 'orbit-environment';
+export type Img3dTouchPinchAction = 'browser' | 'zoom-model';
+export interface Img3dHoverOptions {
+  /** Element that receives gestures. Defaults to the <img-3d> element. */
+  target?: HTMLElement;
+  /** Centered yaw and pitch, and starting zoom. Defaults to the current camera pose. */
+  rest?: {yaw:number;pitch:number;distance?:number};
+  /** Pointer event that activated a preview while the capture was still loading. */
+  initialPointer?: PointerEvent;
+  /** Tilt with vertical viewport position. Off by default and disabled by reduced motion. */
+  viewportTilt?: boolean;
+  /** Pause before the first hover animation, for example while fading out a poster. Defaults to 0. */
+  entryDelayMs?: number;
+  /** Time to hold the pose after leaving, in milliseconds. Defaults to 5000. */
+  returnDelayMs?: number;
+  /** Time to ease back to the resting pose, in milliseconds. Defaults to 4000. */
+  returnDurationMs?: number;
 }
 /** Six octahedral roughness slices followed by a 16×16 BRDF integration table, linear RGBA16F. */
 export interface Img3dEnvironment {size:number;levels:number;data:Uint16Array}
@@ -47,7 +82,7 @@ export declare function registerImg3dDecoder(decoder: {
   dispose(): void;
 }): void;
 
-/** Enhance a native WebP img/picture using currentSrc and the img's data-orbit-fit attribute; disconnect restores the original image. */
+/** Enhance a native WebP img/picture using currentSrc. Use data-hover-controls to enable hover interaction. Disconnect restores the original image. */
 export declare function enhanceImage(target:HTMLImageElement|HTMLPictureElement):{image:HTMLImageElement;element:Img3d;disconnect():void};
 
 export interface Img3dSceneItem {src:string;position:[number,number,number];yaw?:number;scale?:number;opacity?:number}

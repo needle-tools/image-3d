@@ -1,6 +1,7 @@
 import {sceneProjection,instanceCamera,instancePoint,sceneBounds} from './scene-camera.js';
 import {cameraPose} from './camera-motion.js';
-import {orbitEye} from './bounds-fit.js';
+import {cameraFocal} from './bounds-fit.js';
+import {orbitFrame,localLighting,identityRotation,modelRotation} from './view-rotation.js';
 import {enhanced,studioUniforms,studioShader} from './lighting.js';
 import {surfaceCrossingWgsl} from './surface-shader.js';
 import {antialiasShader} from './antialias.js';
@@ -11,13 +12,13 @@ import {groundShadow,shadowShader} from './ground-shadow.js';
 // that element's own WebGPU canvas. No 2D canvas work happens per frame.
 // Boxes stay at twelve triangles; captured surfaces are reconstructed in the
 // fragment shader. Depth-range textures accelerate traversal without meshing.
-const FOCAL=2.41421356,FRAME=11,STRIDE=20,SLOT=512,VIEW=368,ATLAS=4096;
-const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],unit=v=>{const n=Math.hypot(...v);return v.map(x=>x/n);};
+const FRAME=11,STRIDE=20,SLOT=512,VIEW=416,ATLAS=4096;
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const BLOCKS=[[4,4],[5,4],[5,5],[6,5],[6,6],[8,5],[8,6],[8,8],[10,5],[10,6],[10,8],[10,10],[12,10],[12,12]];
 // Texture preparation must leave room for input without changing captured data.
 const yieldTask=()=>globalThis.scheduler?.yield()??new Promise(resolve=>setTimeout(resolve,0));
 const shader=`
-struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f,fog:vec4f,model:vec4f}
+struct View{viewProjection:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,light:vec3f,intensity:f32,ambient:f32,size:f32,emission:u32,blended:u32,batch:u32,clip:u32,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f,fog:vec4f,model:vec4f,rotation:mat3x3f}
 @group(0) @binding(0) var boxes:texture_2d<f32>;
 @group(0) @binding(1) var geometryMap:texture_2d<f32>;
 @group(0) @binding(2) var colorMap:texture_2d<f32>;
@@ -274,7 +275,7 @@ fn shadeSurface(at:vec2f,id:u32,depth:f32)->vec4f{
  let k=pow(rough+1,2.)/8;let gv=nv/(nv*(1-k)+k)*nl/(nl*(1-k)+k);
  let f0=mix(vec3f(.04),base,metal);let Fr=f0+(1-f0)*pow(1-vh,5.);
  let diffuse=base*(1-metal);
- let ambient=mix(vec3f(.16,.19,.25),vec3f(.68,.73,.8),N.y*.5+.5);
+ let ambient=mix(vec3f(.16,.19,.25),vec3f(.68,.73,.8),(view.rotation*N).y*.5+.5);
  let color=ambient*view.ambient*(diffuse+f0*.5)*clamp(orm.y,0.,1.)+(diffuse/3.141593+Fr*d*gv/max(4*nv*nl,.001))*nl*view.intensity+glow;
  return vec4f(srgb(color/(1+color))*alpha,alpha);
 }`;
@@ -297,12 +298,12 @@ function invert(m){
 }
 // The camera every backend shares: orbit eye, then WebGPU's 0..1 clip depth.
 export function camera(el,w,h){
- const view=cameraPose(el),center=el.boundsFit?.center??[0,0,0],eye=orbitEye(view,center);
- const forward=unit(eye.map((x,k)=>center[k]-x)),right=unit(cross(forward,[0,1,0])),up=cross(right,forward),near=.01,far=100,layout=el.layout??{sx:h/w,sy:1,cx:0,cy:0},ratio=el.frameRatio??1;
- const rows=[[...right.map(v=>v*FOCAL*layout.sx/ratio),-dot(right,eye)*FOCAL*layout.sx/ratio],[...up.map(v=>v*FOCAL*layout.sy),-dot(up,eye)*FOCAL*layout.sy],[...forward.map(v=>v*far/(far-near)),-dot(forward,eye)*far/(far-near)-far*near/(far-near)],[...forward,-dot(forward,eye)]];
+ const view=cameraPose(el),{eye,forward,right,up,rotation}=orbitFrame(view,el.boundsFit?.center,el.modelLook);
+ const near=.01,far=100,layout=el.layout??{sx:h/w,sy:1,cx:0,cy:0},ratio=el.frameRatio??1;
+ const rows=[[...right.map(v=>v*cameraFocal*layout.sx/ratio),-dot(right,eye)*cameraFocal*layout.sx/ratio],[...up.map(v=>v*cameraFocal*layout.sy),-dot(up,eye)*cameraFocal*layout.sy],[...forward.map(v=>v*far/(far-near)),-dot(forward,eye)*far/(far-near)-far*near/(far-near)],[...forward,-dot(forward,eye)]];
  for(let k=0;k<4;k++){rows[0][k]+=layout.cx*rows[3][k];rows[1][k]+=layout.cy*rows[3][k];}
  const matrix=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++)matrix[c*4+r]=rows[r][c];
- return{eye,matrix,inverse:invert(matrix),pixel:2*view.distance/(FOCAL*layout.sy*h),focal:FOCAL*layout.sy};
+ return{eye,matrix,inverse:invert(matrix),pixel:2*view.distance/(cameraFocal*layout.sy*h),focal:cameraFocal*layout.sy,rotation};
 }
 export async function createGpu(){
  const adapter=await navigator.gpu?.requestAdapter();if(!adapter)return null;
@@ -395,8 +396,8 @@ async function setup(device,format,features){
   retained?.entries.delete(el);const owner=elementIds.get(el);
   for(const [key,t]of targets)if(t.owner===owner){for(const x of t.textures)x.destroy();targets.delete(key);}
  }
- function pose(item){const view=cameraPose(item.el);return{asset:item.asset,w:item.w,h:item.h,yaw:view.yaw,pitch:view.pitch,distance:view.distance,layout:[...item.el.layoutSignature],x:item.rect[0],y:item.rect[1]};}
- function same(item,old){const view=cameraPose(item.el);return old&&old.asset===item.asset&&old.w===item.w&&old.h===item.h&&old.yaw===view.yaw&&old.pitch===view.pitch&&old.distance===view.distance&&old.layout.every((v,i)=>v===item.el.layoutSignature[i]);}
+ function pose(item){const view=cameraPose(item.el);return{asset:item.asset,w:item.w,h:item.h,yaw:view.yaw,pitch:view.pitch,distance:view.distance,modelLook:item.el.modelLook,layout:[...item.el.layoutSignature],x:item.rect[0],y:item.rect[1]};}
+ function same(item,old){const view=cameraPose(item.el);return old&&old.asset===item.asset&&old.w===item.w&&old.h===item.h&&old.yaw===view.yaw&&old.pitch===view.pitch&&old.distance===view.distance&&old.modelLook===item.el.modelLook&&old.layout.every((v,i)=>v===item.el.layoutSignature[i]);}
  function texture(asset,size,format,usage=GPUTextureUsage.TEXTURE_BINDING|GPUTextureUsage.COPY_DST){const t=device.createTexture({size,format,usage});asset.textures.push(t);return t;}
  async function depthPyramid(asset,rgba,size,changed){
   let deadline=performance.now()+4;
@@ -505,8 +506,10 @@ async function setup(device,format,features){
  // pooled buffer, and every segment is written once before the frame's submit.
  const SEGMENT=256;
  function slot(frame,view,el,batch,page,clip,target=[0,0,1,1],source=[0,0,0,0]){
-  const data=new ArrayBuffer(VIEW),f=new Float32Array(data),i=new Int32Array(data),u=new Uint32Array(data),light=el.lighting;
-  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f[35]=view.focal;f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index+(el.sceneBatchOffset??0);u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);if(el.sceneFog)f.set(el.sceneFog,84);f[88]=el.sceneYaw??0;f[89]=el.sceneOpacity??1;
+  const data=new ArrayBuffer(VIEW),f=new Float32Array(data),u=new Uint32Array(data);
+  const light=view.localLight??=localLighting(el.lighting,view.rotation),rotation=view.rotation??identityRotation;
+  f.set(view.matrix,0);f.set(view.inverse,16);f.set(view.eye,32);f[35]=view.focal;f.set(light.direction,36);f[39]=light.intensity;f[40]=light.ambient;f[41]=page.size;u[42]=page.emission?1:0;u[43]=batch.blend?1:0;u[44]=batch.index+(el.sceneBatchOffset??0);u[45]=clip;f.set(target,48);f.set(source,52);if(enhanced(light))f.set(studioUniforms(light),56);if(el.sceneFog)f.set(el.sceneFog,84);f[89]=el.sceneOpacity??1;
+  for(let column=0;column<3;column++)for(let row=0;row<3;row++)f[92+column*4+row]=rotation[column*3+row];
   let segment=frame.segments.at(-1);
   if(!segment||segment.slots.length===SEGMENT){
    const k=frame.segments.length;if(!pool[k]){const buffer=device.createBuffer({size:SLOT*SEGMENT,usage:GPUBufferUsage.UNIFORM|GPUBufferUsage.COPY_DST});pool[k]={buffer,group:device.createBindGroup({layout:viewLayout,entries:[{binding:0,resource:{buffer,size:VIEW}}]})};}
@@ -656,8 +659,6 @@ async function setup(device,format,features){
   let batchOffset=0;
   const items=instances.map((entry,index)=>{
    if(!entry)return null;const {asset,instance,opacity=1}=entry;if(opacity===0)return null;
-   const c=Math.cos(instance.yaw),s=Math.sin(instance.yaw),rotate=v=>[c*v[0]-s*v[2],v[1],s*v[0]+c*v[2]];
-   const localLighting={...lighting,direction:rotate(lighting.direction),...(lighting.lights?{lights:lighting.lights.map(light=>({...light,direction:rotate(light.direction)}))}:{}),environmentRotation:lighting.environmentRotation??0};
    const fog=settings.fog;
    if(fog&&(!Number.isFinite(fog.near)||!Number.isFinite(fog.far)||fog.far<=fog.near||!(fog.opacity>=0&&fog.opacity<=1)))throw Error('Invalid scene fog');
    if(fog?.opacity===1){
@@ -666,9 +667,10 @@ async function setup(device,format,features){
     const distance=Math.hypot(...shared.eye.map((eye,axis)=>{const values=points.map(p=>p[axis]);return Math.max(Math.min(...values)-eye,0,eye-Math.max(...values));}));
     if(distance>=fog.far)return null;
    }
-   const el={lighting:localLighting,groundShadow:true,sceneBatchOffset:batchOffset,sceneYaw:instance.yaw,sceneOpacity:opacity,sceneFog:fog?[fog.near,fog.far,instance.scale,fog.opacity]:null};batchOffset+=asset.batches.length;
+   const el={lighting,groundShadow:true,sceneBatchOffset:batchOffset,sceneOpacity:opacity,sceneFog:fog?[fog.near,fog.far,instance.scale,fog.opacity]:null};batchOffset+=asset.batches.length;
    if(batchOffset>4096)throw Error('Too many scene batches');
-   const item={index,asset,instance,el,view:instanceCamera(shared,instance),w,h,rect:[0,0,w,h]};item.scissor=sceneScissor(item,w,h);return item;
+   const view={...instanceCamera(shared,instance),rotation:modelRotation(instance.yaw)};
+   const item={index,asset,instance,el,view,w,h,rect:[0,0,w,h]};item.scissor=sceneScissor(item,w,h);return item;
   }).filter(item=>item&&item.scissor[2]&&item.scissor[3]);
   const region=(pass,item)=>{pass.setViewport(0,0,w,h,0,1);pass.setScissorRect(...item.scissor);};
   let pass=encoder.beginRenderPass({colorAttachments:[{view:a.color.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});

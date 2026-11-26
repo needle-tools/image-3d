@@ -64,6 +64,37 @@ direction. Use `data-auto-rotate` on an enhanced native image or picture.
 Rotation waits for the capture, pauses while hidden, and stops when the
 viewer is used. Reduced-motion preferences disable it.
 
+## Use hover controls
+
+Add `data-hover-controls` to an Image 3D `<img>` or `<picture>`, or `hover-controls` to an `<img-3d>`.
+
+```html
+<img data-img-3d data-hover-controls src="./model.webp" alt="Product">
+<img-3d hover-controls src="./model.i3d" alt="Product"></img-3d>
+```
+
+Moving the mouse orbits the preview. Dragging the mouse rotates its [environment lighting](#use-studio-lighting) when an environment is set. On touchscreens, drag sideways to orbit and pinch to zoom. Vertical page scrolling remains native.
+
+In JavaScript, set `preview.element.hoverControls = true` on the handle returned by `enhanceImage()`, or set `hoverControls` on the `<img-3d>` element. Set it to `false` to restore drag controls.
+
+Set these actions independently. Each action overrides its preset default. For a native image or picture, prefix the attribute with `data-`. In JavaScript, set a property to `null` to restore its default.
+
+| Attribute | JS property | Values | Standard | Hover preset |
+| --- | --- | --- | --- | --- |
+| `hover-action` | `hoverAction` | `none`, `orbit`, `orbit-relative`, `look-at` | `none` | `orbit` |
+| `mouse-drag-action` | `mouseDragAction` | `none`, `orbit`, `orbit-environment` | `orbit` | `orbit-environment` |
+| `touch-drag-action` | `touchDragAction` | `none`, `orbit`, `orbit-environment` | `orbit` | `orbit` |
+| `touch-pinch-action` | `touchPinchAction` | `browser`, `zoom-model` | `browser` | `zoom-model` |
+
+`orbit` maps cursor position to a camera angle. `orbit-relative` starts at the current camera angle and orbits as the cursor moves from where it entered. `look-at` turns and nods the model so its +Z forward axis points at the projected cursor. The model’s right axis stays level and the camera frame stays fixed. `orbit-environment` rotates the reflections on a live capture with environment lighting. Touch drags start sideways to leave vertical page scrolling to the browser. Image 3D sets CSS `touch-action` according to the gestures it handles.
+
+```html
+<img-3d hover-controls hover-action="look-at" touch-drag-action="orbit-environment"
+        environment="studio" src="./model.webp" alt="Product"></img-3d>
+```
+
+For custom previews, `element.attachHoverControls({target, rest, initialPointer})` lets you receive gestures on a surrounding element, set the resting pose, or continue a gesture that started before the capture loaded. It returns a cleanup function. Pass `viewportTilt: true` to tilt as the preview scrolls through the viewport. Reduced motion disables that tilt and easing.
+
 ## Control the view with JavaScript
 
 You can also enhance an image already on the page:
@@ -168,7 +199,7 @@ After installing dependencies, start the demo:
 npm run dev
 ```
 
-Open the printed URL to rotate the included models and try different lighting and resolutions. Copy the URL to share the selected settings and camera.
+Open the printed URL to rotate the included models and try different lighting and resolutions. Enable **Hover controls** to configure hover, drag, and pinch actions. Choose **Live light** to rotate the lighting by dragging. Copy the URL to share the selected settings and camera.
 
 ## Development and reference
 

@@ -1,11 +1,20 @@
 import {readState,stateUrl} from './state.js';
 import {chooseSource} from '../src/responsive.js';
 import {attachGridInteraction} from './grid.js';
+import {inputActions} from '../src/input-actions.js';
 const models=__MODELS__;
 const byId=id=>document.getElementById(id),model=byId('model'),resolution=byId('resolution'),appearance=byId('appearance'),viewer=byId('viewer'),turntable=byId('turntable'),light=byId('light'),many=byId('many'),reference=byId('reference'),grid=byId('grid'),stage=byId('stage'),view=byId('view'),gridSize=byId('gridSize');
 const bytes=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':(n/1000).toFixed(1)+' KB';let generation=0,decoder,lightingModule,studio,tiles=[],animation=0,stageVisible=true,gridVisible=false;
 const native=byId('native'),nativePicture=byId('nativePicture'),nativeImage=byId('nativeImage');let nativeController,runtimeModule;
-const follow=byId('follow'),fixed=byId('fixed');let gridInteraction,turntableModule,runtime;
+const follow=byId('follow'),fixed=byId('fixed'),hover=byId('hover');let gridInteraction,turntableModule,runtime;
+const actionMenus=Object.entries(inputActions).map(([name,rule])=>({name,select:byId(name),preset:rule.preset}));
+function applyActions(element,prefix,enabled){
+ for(const {name,select,preset} of actionMenus){
+  const attribute=prefix+name,value=enabled&&select.value!==preset?select.value:null;
+  if(element.getAttribute(attribute)===value)continue;
+  if(value===null)element.removeAttribute(attribute);else element.setAttribute(attribute,value);
+ }
+}
 const state=readState(location.search,models);fixed.checked=state.fixed;
 function setFraming(el){const mode=fixed.checked?'fixed':'auto';if(el.dataset.orbitFit!==mode)el.dataset.orbitFit=mode;}
 function applyFraming(){for(const el of [viewer,nativeImage,...tiles.filter(el=>el.localName==='img-3d')])setFraming(el);}
@@ -31,7 +40,8 @@ for(const m of models)model.add(new Option(m.label,m.id));
 function controls(){const m=models.find(m=>m.id===model.value),size=resolution.value,mode=appearance.value;resolution.replaceChildren(...m.resolutions.map(r=>new Option(String(r.size),String(r.size))),...(mode==='webp'?[]:[new Option('Auto','auto')]));if(size==='auto'&&mode!=='webp'||m.resolutions.some(r=>String(r.size)===size))resolution.value=size;const r=m.resolutions.find(r=>String(r.size)===resolution.value)??m.resolutions[0];appearance.replaceChildren(...r.variants.map(v=>new Option(v.name,v.id)));appearance.value=r.variants.some(v=>v.id===mode)?mode:'baked';}
 function restore(state){
  model.value=state.model;controls();resolution.value=String(state.resolution);controls();appearance.value=state.appearance;
- native.checked=state.native;many.checked=state.grid;light.checked=state.light;reference.checked=state.reference;follow.checked=state.follow;fixed.checked=state.fixed;gridSize.value=state.size;byId('measurements').open=state.measurements;resizeGrid();
+ native.checked=state.native;many.checked=state.grid;light.checked=state.light;reference.checked=state.reference;hover.checked=state.hover;follow.checked=state.follow;fixed.checked=state.fixed;gridSize.value=state.size;byId('measurements').open=state.measurements;resizeGrid();
+ for(const {name,select} of actionMenus)select.value=state[name];
 }
 restore(state);
 function selected(){const m=models.find(m=>m.id===model.value),current=resolution.value==='auto'?(native.checked&&!native.disabled?nativeController?.element:viewer)?.currentSrc:null,r=m.resolutions.find(r=>resolution.value==='auto'?r.variants.some(v=>current?.endsWith('/'+v.src)||current?.endsWith('/'+v.image?.src)):String(r.size)===resolution.value)??m.resolutions[0];return [m,r,r.variants.find(v=>v.id===appearance.value)];}
@@ -96,24 +106,31 @@ new ResizeObserver(()=>{if(native.checked&&resolution.value==='auto')nativeImage
 async function update(){
  cancelAnimationFrame(animation);gridInteraction?.clear();comparisonDrag=null;
  const stamp=++generation,[m,r,v]=selected(),isWebp=v.id==='webp';const oldPose=presented();let el=active();native.disabled=isWebp||many.checked;fixed.disabled=isWebp;applyFraming();
+ hover.disabled=isWebp||many.checked;
+ const useHover=hover.checked&&!hover.disabled,moving=light.checked&&v.id.startsWith('pbr')&&!many.checked;
+ byId('actions').hidden=!useHover;
+ reference.disabled=isWebp||many.checked||moving||useHover;
+ const compare=comparing();
  byId('error').hidden=true;view.max=r.turntable.frames-1;
  const gridModels=models.map(m=>{const match=m.resolutions.find(res=>res.size===r.size)?.variants.find(item=>item.id===v.id);return{model:m,variant:match};});
  if(many.checked&&gridModels.some(item=>!item.variant))throw Error('The selected appearance and resolution are not available for every model');
  renderMeasurements();
- if(isWebp||reference.checked&&!many.checked&&!(light.checked&&v.id.startsWith('pbr'))){turntableModule??=import('./runtime/turntable.js');await turntableModule;if(stamp!==generation)return;}
+ if(isWebp||compare){turntableModule??=import('./runtime/turntable.js');await turntableModule;if(stamp!==generation)return;}
  if(!isWebp){runtime??=import(v.id.endsWith('xuastc')?'./runtime/img-3d-xuastc.js':'./runtime/img-3d.js');runtimeModule=await runtime;if(stamp!==generation)return;}
  if(many.checked){gridInteraction??=attachGridInteraction(grid,()=>tiles);gridInteraction.setEnabled(follow.checked);}
  if(v.id.endsWith('xuastc')){decoder??=import('./runtime/img-3d-xuastc.js');await decoder;if(stamp!==generation)return;}
  if(v.id.startsWith('pbr')){lightingModule??=await import('./runtime/lighting.js');studio??=await lightingModule.loadStudio();if(stamp!==generation)return;}
  const liveLighting=v.id.startsWith('pbr')?lightingModule.studioLighting(studio):null;
- const moving=light.checked&&v.id.startsWith('pbr')&&!many.checked;
- stage.hidden=many.checked;grid.hidden=!many.checked;reference.disabled=many.checked||moving||isWebp;light.disabled=!v.id.startsWith('pbr');byId('viewControls').hidden=!reference.checked||many.checked||moving||isWebp;
+ stage.hidden=many.checked;grid.hidden=!many.checked;light.disabled=!v.id.startsWith('pbr');byId('viewControls').hidden=!compare;
  gridSize.disabled=follow.disabled=!many.checked;model.disabled=many.checked;model.title=many.checked?'Grid shows every model':'';
- const compare=reference.checked&&!many.checked&&!moving&&!isWebp;stage.classList.toggle('reference',compare);byId('referenceFigure').hidden=!compare;
+ stage.classList.toggle('reference',compare);byId('referenceFigure').hidden=!compare;
  const useNative=native.checked&&!native.disabled;viewer.hidden=isWebp||useNative;turntable.hidden=!isWebp;nativePicture.hidden=!useNative;
  if(useNative){configureImage(m,v.id,resolution.value);if(!nativeController){nativeController=runtimeModule.enhanceImage(nativePicture);wireGestures(nativeController.element);Object.assign(nativeController.element,{yaw:oldPose.yaw,pitch:oldPose.pitch,distance:oldPose.distance});}el=nativeController.element;}else if(nativeController){if(!pendingPose)Object.assign(viewer,{yaw:nativeController.element.yaw,pitch:nativeController.element.pitch,distance:nativeController.element.distance});nativeController.disconnect();nativeController=null;nativeImage.removeAttribute('src');nativeImage.removeAttribute('srcset');}
  if(runtime){viewer.lighting=liveLighting;if(nativeController)nativeController.element.lighting=liveLighting;}
  if(pendingPose){for(const target of [el,turntable,referenceViewer])if(target.reset){Object.assign(target,pendingPose);}pendingPose=null;}
+ if(runtimeModule){viewer.hoverControls=useHover&&!useNative;applyActions(viewer,'',useHover&&!useNative);}
+ nativeImage.toggleAttribute('data-hover-controls',useHover&&useNative);
+ applyActions(nativeImage,'data-',useHover&&useNative);
  if(!compare)referenceViewer.removeAttribute('src');
  if(many.checked){
   viewer.removeAttribute('src');turntable.removeAttribute('src');
@@ -130,10 +147,12 @@ function resizeGrid(){grid.style.setProperty('--item-size',gridSize.value+'px');
 gridSize.oninput=()=>{resizeGrid();save();};
 fixed.onchange=()=>{applyFraming();save(true);};
 follow.onchange=()=>{gridInteraction?.setEnabled(follow.checked);save(true);};
-const change=()=>{save(true);return update().catch(error=>{byId('error').textContent=error.message;byId('error').hidden=false;});};model.onchange=resolution.onchange=()=>{controls();change();};appearance.onchange=()=>{controls();change();};native.onchange=many.onchange=reference.onchange=light.onchange=change;view.oninput=matchView;
+const change=()=>{save(true);return update().catch(error=>{byId('error').textContent=error.message;byId('error').hidden=false;});};model.onchange=resolution.onchange=()=>{controls();change();};appearance.onchange=()=>{controls();change();};native.onchange=many.onchange=reference.onchange=light.onchange=hover.onchange=change;view.oninput=matchView;
+for(const {select} of actionMenus)select.onchange=change;
 byId('reset').onclick=()=>{if(many.checked){gridInteraction?.clear();for(const tile of tiles)tile.reset();}else if(comparing())referenceViewer.reset();else active().reset();save();};
 function save(push=false){
- const pose=pendingPose??presented();const value={model:model.value,resolution:resolution.value==='auto'?'auto':Number(resolution.value),native:native.checked,appearance:appearance.value,grid:many.checked,light:light.checked,reference:reference.checked,follow:follow.checked,fixed:fixed.checked,size:Number(gridSize.value),measurements:byId('measurements').open,yaw:pose.yaw??state.yaw,pitch:pose.pitch??state.pitch,distance:pose.distance??state.distance};
+ const pose=pendingPose??presented();const value={model:model.value,resolution:resolution.value==='auto'?'auto':Number(resolution.value),native:native.checked,appearance:appearance.value,grid:many.checked,light:light.checked,reference:reference.checked,hover:hover.checked,follow:follow.checked,fixed:fixed.checked,size:Number(gridSize.value),measurements:byId('measurements').open,yaw:pose.yaw??state.yaw,pitch:pose.pitch??state.pitch,distance:pose.distance??state.distance};
+ for(const {name,select} of actionMenus)value[name]=select.value;
  const next=stateUrl(location.href,value);if(next.href!==location.href)history[push?'pushState':'replaceState'](null,'',next);
 }
 let pendingPose={yaw:state.yaw,pitch:state.pitch,distance:state.distance},poseTimer;

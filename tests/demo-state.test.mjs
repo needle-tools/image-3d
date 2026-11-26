@@ -7,9 +7,15 @@ import {chromium} from '@playwright/test';
 import {readState,stateUrl,defaults} from '../demo/state.js';
 const models=JSON.parse(await readFile('demo/catalog.json'));
 
+async function serveDemo(){
+ const root=resolve('demo/public'),server=createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost'),path=resolve(root,'.'+(url.pathname==='/'?'/index.html':url.pathname));if(!path.startsWith(root+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':extname(path)==='.html'?'text/html':'application/octet-stream');res.end(await readFile(path));}catch{res.statusCode=404;res.end();}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));return {server,origin:'http://127.0.0.1:'+server.address().port};
+}
+
 test('demo URLs validate settings and round-trip camera and controls',()=>{
- const state=readState('?model=watch&resolution=1024&appearance=pbr-xuastc&grid=1&light=1&reference=1&follow=0&size=100&measurements=1&yaw=-1.2&pitch=.4&distance=3.6',models);
- assert.deepEqual(state,{model:'watch',resolution:1024,appearance:'pbr-xuastc',native:false,grid:true,light:true,reference:true,follow:false,fixed:true,size:100,measurements:true,yaw:-1.2,pitch:.4,distance:3.6});
+ const state=readState('?model=watch&resolution=1024&appearance=pbr-xuastc&grid=1&light=1&reference=1&hover=1&hover-action=look-at&touch-drag-action=orbit-environment&follow=0&size=100&measurements=1&yaw=-1.2&pitch=.4&distance=3.6',models);
+ assert.deepEqual(state,{model:'watch',resolution:1024,appearance:'pbr-xuastc',native:false,grid:true,light:true,reference:true,hover:true,follow:false,fixed:true,size:100,measurements:true,yaw:-1.2,pitch:.4,distance:3.6,
+  'hover-action':'look-at','mouse-drag-action':'orbit-environment','touch-drag-action':'orbit-environment','touch-pinch-action':'zoom-model'});
  const url=stateUrl('https://example.com/demo?campaign=test#view',state);assert.equal(url.searchParams.get('campaign'),'test');assert.equal(url.hash,'#view');assert.deepEqual(readState(url.search,models),state);
  assert.equal(stateUrl('https://example.com/',defaults).search,'');assert.deepEqual(readState('?model=unknown&resolution=17&appearance=unknown&follow=oops&yaw=NaN&distance=Infinity',models),defaults);
  assert.equal(readState('?fixed=0',models).fixed,false);
@@ -18,8 +24,7 @@ test('demo URLs validate settings and round-trip camera and controls',()=>{
 });
 
 test('demo starts the capture before the runtime arrives and restores shared URLs',{timeout:120000},async()=>{
- const root=resolve('demo/public'),server=createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost'),path=resolve(root,'.'+(url.pathname==='/'?'/index.html':url.pathname));if(!path.startsWith(root+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':extname(path)==='.html'?'text/html':'application/octet-stream');res.end(await readFile(path));}catch{res.statusCode=404;res.end();}});
- await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({channel:'chrome',headless:true});
+ const {server,origin}=await serveDemo(),browser=await chromium.launch({channel:'chrome',headless:true});
  try{
   const page=await browser.newPage(),requests=[],errors=[];page.on('request',r=>requests.push({url:r.url(),time:performance.now()}));page.on('pageerror',e=>errors.push(String(e)));let runtimeArrived;
   page.on('response',r=>{if(r.url().endsWith('/runtime/img-3d.js'))runtimeArrived=performance.now();});
@@ -41,8 +46,7 @@ test('demo starts the capture before the runtime arrives and restores shared URL
 });
 
 test('fixed framing toggles the single, native and grid views and restores from the URL',{timeout:120000},async()=>{
- const root=resolve('demo/public'),server=createServer(async(req,res)=>{try{const url=new URL(req.url,'http://localhost'),path=resolve(root,'.'+(url.pathname==='/'?'/index.html':url.pathname));if(!path.startsWith(root+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':extname(path)==='.html'?'text/html':'application/octet-stream');res.end(await readFile(path));}catch{res.statusCode=404;res.end();}});
- await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port,browser=await chromium.launch({channel:'chrome',headless:true});
+ const {server,origin}=await serveDemo(),browser=await chromium.launch({channel:'chrome',headless:true});
  try{
   const page=await browser.newPage({viewport:{width:1200,height:900}});page.setDefaultTimeout(10000);const errors=[];page.on('pageerror',e=>errors.push(String(e)));
   await page.goto(origin);await page.waitForFunction(()=>document.querySelector('#viewer')?.data);
@@ -61,5 +65,45 @@ test('fixed framing toggles the single, native and grid views and restores from 
   await page.getByLabel('Grid',{exact:true}).uncheck();await page.getByLabel('Appearance',{exact:true}).selectOption('webp');await page.waitForFunction(()=>document.querySelector('#turntable')?.data);assert.equal(await toggle.isVisible(),false);
   await page.getByLabel('Appearance',{exact:true}).selectOption('baked');await page.waitForFunction(()=>!document.querySelector('#fixed').disabled);assert.equal(await toggle.isVisible(),true);assert.equal(await toggle.isChecked(),false);
   assert.deepEqual(errors,[]);await page.close();
+ }finally{await browser.close();await new Promise(r=>server.close(r));}
+});
+
+test('hover controls orbit and drag studio lighting and carry over to native images',{timeout:60000},async()=>{
+ const {server,origin}=await serveDemo(),browser=await chromium.launch({channel:'chrome',headless:true});
+ try{
+  const page=await browser.newPage({viewport:{width:1000,height:760},reducedMotion:'reduce'});
+  page.setDefaultTimeout(6000);
+  await page.goto(origin+'/?appearance=pbr&reference=1');
+  await page.waitForFunction(()=>document.querySelector('#viewer')?.data&&document.querySelector('#referenceViewer')?.data,undefined,{timeout:20000});
+  const toggle=page.getByLabel('Hover controls',{exact:true});
+  assert.equal(await toggle.isChecked(),false);
+  await toggle.check();
+  await page.waitForFunction(()=>document.querySelector('#viewer').hoverControls);
+  assert.equal(new URL(page.url()).searchParams.get('hover'),'1');
+  assert.equal(await page.locator('#referenceFigure').isVisible(),false);
+  const viewer=page.locator('#viewer'),box=await viewer.locator('canvas').boundingBox();
+  const x=box.x+box.width/2,y=box.y+box.height/2,rest=await viewer.evaluate(el=>el.yaw);
+  await page.mouse.move(x+box.width*.15,y);
+  await page.waitForFunction(yaw=>document.querySelector('#viewer').yaw<yaw-.3,rest);
+  const pose=await viewer.evaluate(el=>[el.yaw,el.pitch,el.distance]);
+  await page.mouse.down();await page.mouse.move(x+box.width*.3,y+25);
+  await page.waitForFunction(()=>document.querySelector('#viewer').lighting.environmentRotation>.5);
+  assert.deepEqual(await viewer.evaluate(el=>[el.yaw,el.pitch,el.distance]),pose);
+  await page.mouse.up();
+  await page.getByLabel('Native image',{exact:true}).check();
+  const nativeReady=()=>page.waitForFunction(()=>{const el=document.querySelector('#nativePicture img-3d');return el?.hoverControls&&el.data;},undefined,{timeout:20000});
+  await nativeReady();
+  await page.getByLabel('Hover',{exact:true}).selectOption('look-at');
+  await page.getByLabel('Touch drag',{exact:true}).selectOption('orbit-environment');
+  await page.reload();await nativeReady();assert.equal(await toggle.isChecked(),true);
+  await page.waitForFunction(()=>{
+   const el=document.querySelector('#nativePicture img-3d');
+   return el.hoverAction==='look-at'&&el.touchDragAction==='orbit-environment';
+  });
+  await page.getByLabel('Hover',{exact:true}).selectOption('orbit-relative');
+  await page.waitForFunction(()=>document.querySelector('#nativePicture img-3d').hoverAction==='orbit-relative');
+  assert.equal(new URL(page.url()).searchParams.get('hover-action'),'orbit-relative');
+  await toggle.uncheck();await page.waitForFunction(()=>!document.querySelector('#nativePicture img-3d').hoverControls);
+  assert.equal(await page.locator('#referenceFigure').isVisible(),true);
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 });
