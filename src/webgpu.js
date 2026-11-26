@@ -81,13 +81,13 @@ fn fieldAt(t:f32)->f32{
 ${surfaceCrossingWgsl()}
 // A conservative depth-range pyramid skips empty ray intervals. Its leaf is
 // 4x4 captured texels; exact texel traversal determines the supported hit.
-fn trace(o:vec3f,d:vec3f,p:ptr<function,vec3f>,chosen:ptr<function,i32>)->bool{
+fn trace(o:vec3f,d:vec3f,rayStop:f32,p:ptr<function,vec3f>,chosen:ptr<function,i32>)->bool{
  let safe=select(vec3f(-1e-12),vec3f(1e-12),d>=vec3f(0));
  let inverse=1/select(safe,d,abs(d)>vec3f(1e-12));
  let a=(-1-o)*inverse;let b=(1-o)*inverse;
  let lower=min(a,b);let upper=max(a,b);
  let enter=max(0.,max(lower.x,max(lower.y,lower.z)));let exit=min(upper.x,min(upper.y,upper.z));
- if(exit<enter){return false;}
+ if(exit<enter||rayStop<enter){return false;}
  var best=exit+1.;var found=false;var bestFace=0;
  let maxLevel=i32(textureNumLevels(depthRanges))+1;
  let halfSize=textureLoad(boxes,vec2i(1,box),0).xyz;
@@ -118,9 +118,11 @@ fn trace(o:vec3f,d:vec3f,p:ptr<function,vec3f>,chosen:ptr<function,i32>)->bool{
    fieldOrigin=origin;fieldVelocity=velocity;fieldRect=r;fieldZ=z0;fieldSlope=slope;
   let span=max(abs(velocity.x),abs(velocity.y))*(end-t);
   let firstLevel=clamp(i32(ceil(log2(max(span,1.)))),2,maxLevel);
-  var level=firstLevel;
+  // Start at the leaf for nearby hits. Empty intervals still grow the search
+  // to the largest useful range tile.
+  var level=2;
   loop{
-   if(t>end){break;}
+   if(t>end||t>rayStop){break;}
    // A small forward bias chooses the entered cell at an exact grid boundary.
    let position=clamp(origin+velocity*t+sign(velocity)*.0001,r.xy,r.xy+r.zw-.0001);
    let scale=f32(1<<u32(level));let tile=floor(position/scale);
@@ -139,8 +141,14 @@ fn trace(o:vec3f,d:vec3f,p:ptr<function,vec3f>,chosen:ptr<function,i32>)->bool{
      // issue together; refine only the supported crossings, nearest first.
      let count=clamp(i32(ceil(2*max(abs(velocity.x),abs(velocity.y))*(stop-t))),1,8);
      let delta=(stop-t)/f32(count);let first=fieldAt(t);
-     let d0=vec4f(fieldAt(t+delta),fieldAt(t+delta*f32(min(count,2))),fieldAt(t+delta*f32(min(count,3))),fieldAt(t+delta*f32(min(count,4))));
-     let d1=vec4f(fieldAt(t+delta*f32(min(count,5))),fieldAt(t+delta*f32(min(count,6))),fieldAt(t+delta*f32(min(count,7))),fieldAt(t+delta*f32(count)));
+     var d0=vec4f(fieldAt(t+delta));
+     if(count>1){
+      d0=vec4f(d0.x,fieldAt(t+delta*2.),fieldAt(t+delta*f32(min(count,3))),fieldAt(t+delta*f32(min(count,4))));
+     }
+     var d1=vec4f(0);
+     if(count>4){
+      d1=vec4f(fieldAt(t+delta*5.),fieldAt(t+delta*f32(min(count,6))),fieldAt(t+delta*f32(min(count,7))),fieldAt(t+delta*f32(count)));
+     }
      let c0=d0*vec4f(first,d0.xyz)<=vec4f(0);let c1=d1*vec4f(d0.w,d1.xyz)<=vec4f(0);
      var crossings=(u32(c0.x)<<0u)|(u32(c0.y)<<1u)|(u32(c0.z)<<2u)|(u32(c0.w)<<3u)|(u32(c1.x)<<4u)|(u32(c1.y)<<5u)|(u32(c1.z)<<6u)|(u32(c1.w)<<7u);
      crossings&=(1u<<u32(count))-1u;
@@ -175,25 +183,50 @@ fn trace(o:vec3f,d:vec3f,p:ptr<function,vec3f>,chosen:ptr<function,i32>)->bool{
 // so overlapping surfaces resolve by their captured positions. Empty captured
 // texels cannot own a pixel, even when a filtered depth crossing exists.
 struct Visible{@location(0) id:u32,@builtin(frag_depth) depth:f32}
-@fragment fn vis(input:Out)->Visible{
+fn traceCarrier(input:Out)->Visible{
  box=input.id.x;
  let local=vec2i(input.position.xy-view.area.xy+view.shift.zw);
  let o=eyeLocal();let d=input.local-o;
- var p=input.local;var selected=0;let hit=trace(o,d,&p,&selected);face=selected;
+ var opaqueDepth=1.;
+ var rayStop=1e20;
+ if(view.clip==1){
+  opaqueDepth=textureLoad(hits,local,0);
+  if(opaqueDepth<1.){
+   // Solve clip.z/clip.w for the parameter along this carrier ray. Expand
+   // the stop slightly for roundoff and keep the original final depth test.
+   let eye=view.viewProjection*vec4f(view.eye,1);
+   let backW=1./input.position.w;
+   let backZ=input.position.z*backW;
+   let denominator=backZ-eye.z-opaqueDepth*(backW-eye.w);
+   if(abs(denominator)>1e-7){
+    let t=(opaqueDepth*eye.w-eye.z)/denominator;
+    if(t>=0.){rayStop=t+max(abs(t)*2e-5,2e-5);}
+   }
+  }
+ }
+ var p=input.local;var selected=0;let hit=trace(o,d,rayStop,&p,&selected);face=selected;
  let r0=F(0);let r1=F(1);let r2=F(2);let clip=view.viewProjection*vec4f(dot(r0.xyz,p)+r0.w,dot(r1.xyz,p)+r1.w,dot(r2.xyz,p)+r2.w,1);let depth=clip.z/clip.w;
  // Translucent layers stop at the opaque surface already in front of them.
- var behind=false;if(view.clip==1){behind=depth>=textureLoad(hits,local,0);}
+ var behind=false;if(view.clip==1){behind=depth>=opaqueDepth;}
  // Binary ownership: a surface owns the pixel when it covers most of it.
  if(!hit||behind||depth<0||depth>1){discard;}
  var result:Visible;result.id=u32(box*6+face+1)|(view.batch<<20);result.depth=depth;return result;
 }
+@fragment fn vis(input:Out)->Visible{return traceCarrier(input);}
 @fragment fn clearVisibility()->Visible{var result:Visible;result.id=0u;result.depth=1.;return result;}
 @vertex fn screen(@builtin(vertex_index) i:u32)->@builtin(position) vec4f{return vec4f(f32(i/2u)*4-1,f32(i%2u)*4-1,0,1);}
 // Shading runs once per pixel from the visibility pass's hit.
 @fragment fn shade(@builtin(position) position:vec4f)->@location(0) vec4f{
  let at=position.xy-view.area.xy;let pixel=vec2i(at+view.shift.xy);let id=textureLoad(visible,pixel,0).r;
  if(id==0||id>>20!=view.batch){discard;}
- let ndc=vec4f(at.x/view.area.z*2-1,1-at.y/view.area.w*2,textureLoad(hits,pixel,0),1);
+ return shadeSurface(at,id,textureLoad(hits,pixel,0));
+}
+@fragment fn traceAndBlend(input:Out)->@location(0) vec4f{
+ let hit=traceCarrier(input);
+ return shadeSurface(input.position.xy-view.area.xy,hit.id,hit.depth);
+}
+fn shadeSurface(at:vec2f,id:u32,depth:f32)->vec4f{
+ let ndc=vec4f(at.x/view.area.z*2-1,1-at.y/view.area.w*2,depth,1);
  let world4=view.inverse*ndc;let world=world4.xyz/world4.w;
  let code=i32(id&0xfffffu)-1;box=code/6;face=code%6;let r=rect(face);
  let e=world-textureLoad(boxes,vec2i(0,box),0).xyz;P=vec3f(dot(F(3).xyz,e),dot(F(4).xyz,e),dot(F(5).xyz,e))/textureLoad(boxes,vec2i(1,box),0).xyz;
@@ -296,11 +329,26 @@ async function setup(device,format,features){
  const vis=device.createRenderPipelineAsync({layout,primitive:{topology:'triangle-list',cullMode:'front'},
   vertex:{module,entryPoint:'vs'},
   fragment:{module,entryPoint:'vis',targets:[{format:'r32uint'}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'less'}});
- const shading=(baked,blend,enhanced=false,moving=false)=>device.createRenderPipelineAsync({layout,primitive:{topology:'triangle-list'},vertex:{module,entryPoint:'screen'},
-  fragment:{module,entryPoint:'shade',constants:{baked:baked?1:0,enhanced,moving},targets:[{format,blend:blend?{color:{srcFactor:'one',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]}});
+ const shading=(baked,blend,enhanced=false,moving=false,trace=false)=>device.createRenderPipelineAsync({layout,
+  primitive:{topology:'triangle-list',cullMode:trace?'front':'none'},
+  vertex:{module,entryPoint:trace?'vs':'screen'},
+  fragment:{module,entryPoint:trace?'traceAndBlend':'shade',constants:{baked:baked?1:0,enhanced,moving},
+   targets:[{format,blend:blend?{color:{srcFactor:'one',dstFactor:'one-minus-src-alpha'},alpha:{srcFactor:'one',dstFactor:'one-minus-src-alpha'}}:undefined}]}});
  const reset=device.createRenderPipelineAsync({layout:'auto',primitive:{topology:'triangle-list'},vertex:{module,entryPoint:'screen'},fragment:{module,entryPoint:'clearVisibility',targets:[{format:'r32uint'}]},depthStencil:{format:'depth32float',depthWriteEnabled:true,depthCompare:'always'}});
  const [visible,clear,pbr,baked,pbrBlend,bakedBlend]=await Promise.all([vis,reset,shading(false,false),shading(true,false),shading(false,true),shading(true,true)]),pipelines={visible,clear,pbr,baked,pbrBlend,bakedBlend};
  const [studio,studioBlend,cinematic,cinematicBlend]=await Promise.all([shading(false,false,true),shading(false,true,true),shading(false,false,true,true),shading(false,true,true,true)]);Object.assign(pipelines,{studio,studioBlend,cinematic,cinematicBlend});
+ let scenePipelines;
+ function prepareScene(){
+  // Element viewers keep their reusable visibility buffers. Compile the
+  // fused variants only when the shared-camera scene API is used.
+  scenePipelines??=Promise.all([
+   shading(false,true,false,false,true),shading(true,true,false,false,true),
+   shading(false,true,true,false,true),shading(false,true,true,true,true),
+  ]).then(([pbrFused,bakedFused,studioFused,cinematicFused])=>{
+   Object.assign(pipelines,{pbrFused,bakedFused,studioFused,cinematicFused});
+  }).catch(error=>{scenePipelines=undefined;throw error;});
+  return scenePipelines;
+ }
  const resolveModule=device.createShaderModule({code:`
  struct View{matrix:mat4x4f,inverse:mat4x4f,eye:vec3f,focal:f32,padding:array<vec4f,3>,area:vec4f,shift:vec4f,lights:array<vec4f,6>,environment:vec4f,fog:vec4f,model:vec4f}
  struct Shadow{bounds:vec4f,params:vec4f}
@@ -326,8 +374,8 @@ async function setup(device,format,features){
   }
   return record.group;
  }
- function shadePipeline(item,blend=false){
-  const light=item.el.lighting,key=item.asset.data.appearance==='baked'?'baked':enhanced(light)?light.lights?.length?'cinematic':'studio':'pbr';return pipelines[key+(blend?'Blend':'')];
+ function shadePipeline(item,mode=''){
+  const light=item.el.lighting,key=item.asset.data.appearance==='baked'?'baked':enhanced(light)?light.lights?.length?'cinematic':'studio':'pbr';return pipelines[key+mode];
  }
  const sceneTargets=new Set();
  const targets=new Map(),pool=[],elementIds=new WeakMap();let tick=0,serial=0,retained=null;
@@ -502,8 +550,8 @@ async function setup(device,format,features){
   frame.items.push({el,owner:elementIds.get(el),asset,w,h,view,rect:[at[0],at[1],w,h],transparent:transparent.sort((a,b)=>b[2]-a[2])});
   return true;
  }
- function carriers(frame,pass,item,draws,clip,source,target=item.rect){
-  const {el,asset,view}=item;pass.setBindGroup(3,studioBinding({}));
+ function carriers(frame,pass,item,draws,clip,source,target=item.rect,shade=false){
+  const {el,asset,view}=item;pass.setBindGroup(3,studioBinding(shade&&asset.data.appearance!=='baked'?el.lighting:{}));
   for(const [batch,first,count]of draws){
    const [uniforms,offset]=slot(frame,view,el,batch,asset.data.pages[batch.page],clip,target,source);
    pass.setBindGroup(0,batch.group);pass.setBindGroup(1,uniforms,[offset]);pass.draw(36,count,0,first);
@@ -545,7 +593,7 @@ async function setup(device,format,features){
     pass.setPipeline(pipelines.visible);pass.setBindGroup(2,a.clip);carriers(frame,pass,item,[[batch,i,1]],1,[0,0,item.rect[0],item.rect[1]],[0,0,item.w,item.h]);pass.end();layer.pose=pose(item);
     }
     pass=encoder.beginRenderPass({colorAttachments:[{view:a.views.color,loadOp:'load',storeOp:'store'}]});
-    region(pass,item.rect);pass.setPipeline(shadePipeline(item,true));pass.setBindGroup(2,layer.read);screen(frame,pass,item,[batch],item.rect,[0,0,0,0]);pass.end();
+    region(pass,item.rect);pass.setPipeline(shadePipeline(item,'Blend'));pass.setBindGroup(2,layer.read);screen(frame,pass,item,[batch],item.rect,[0,0,0,0]);pass.end();
    }
    const entries=new WeakMap();for(const item of items)entries.set(item.el,pose(item));retained={atlas:a,entries};
    const live=items.filter(item=>item.el.groundShadow||item.asset.data.appearance!=='baked'&&enhanced(item.el.lighting));
@@ -589,7 +637,7 @@ async function setup(device,format,features){
  function sceneTarget(record,canvas,w,h){
   if(record.device!==device){record.context=canvas.getContext('webgpu');if(!record.context)throw Error('Scene requires a WebGPU canvas');record.context.configure({device,format,alphaMode:'premultiplied'});record.device=device;sceneTargets.add(record);}
   if(record.width!==w||record.height!==h){
-   for(const t of record.textures??[])t.destroy();record.textures=[];record.layer=null;
+   for(const t of record.textures??[])t.destroy();record.textures=[];
    const make=format=>{const t=device.createTexture({size:[w,h],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});record.textures.push(t);return t;};
    record.color=make(format);record.id=make('r32uint');record.depth=make('depth32float');record.read=aux(record.id,record.depth);record.clip=aux(none[0],record.depth);record.width=w;record.height=h;record.bytes=w*h*12;
   }
@@ -634,11 +682,16 @@ async function setup(device,format,features){
   const transparent=[];
   for(const item of items)for(const batch of item.asset.batches)if(batch.blend)batch.boxes.forEach((box,index)=>{const center=instancePoint(item.instance,box.c);transparent.push({item,batch,index,distance:center.reduce((sum,v,i)=>sum+(v-shared.eye[i])**2,0)});});
   transparent.sort((a,b)=>b.distance-a.distance);
-  for(const {item,batch,index}of transparent){
-   if(!a.layer){const id=device.createTexture({size:[w,h],format:'r32uint',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING}),depth=device.createTexture({size:[w,h],format:'depth32float',usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});a.textures.push(id,depth);a.bytes+=w*h*8;a.layer={id,depth,read:aux(id,depth)};}
-   const layer=a.layer;
-   pass=encoder.beginRenderPass({colorAttachments:[{view:layer.id.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}],depthStencilAttachment:{view:layer.depth.createView(),depthClearValue:1,depthLoadOp:'clear',depthStoreOp:'store'}});region(pass,item);pass.setPipeline(pipelines.visible);pass.setBindGroup(2,a.clip);carriers(f,pass,item,[[batch,index,1]],1,[0,0,0,0]);pass.end();
-   pass=encoder.beginRenderPass({colorAttachments:[{view:a.color.createView(),loadOp:'load',storeOp:'store'}]});region(pass,item);pass.setPipeline(shadePipeline(item,true));pass.setBindGroup(2,layer.read);screen(f,pass,item,[batch],item.rect,[0,0,0,0]);pass.end();
+  // Standalone scenes retrace every draw. Blend each box directly from its
+  // supported hit and keep the far-to-near order and the opaque depth test.
+  if(transparent.length){
+   pass=encoder.beginRenderPass({colorAttachments:[{view:a.color.createView(),loadOp:'load',storeOp:'store'}]});
+   pass.setBindGroup(2,a.clip);
+   for(const {item,batch,index}of transparent){
+    region(pass,item);pass.setPipeline(shadePipeline(item,'Fused'));
+    carriers(f,pass,item,[[batch,index,1]],1,[0,0,0,0],item.rect,true);
+   }
+   pass.end();
   }
   const output=record.context.getCurrentTexture();
   pass=encoder.beginRenderPass({colorAttachments:[{view:output.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});
@@ -647,6 +700,6 @@ async function setup(device,format,features){
   device.queue.submit([encoder.finish()]);tick++;evict();
   return items.map(item=>({...sceneBounds(shared,item.instance,w,h),index:item.index}));
  }
- return{device,format,features,maxTexture:device.limits.maxTextureDimension2D,upload,destroy,frame,present,submit,release,forget,trimEnvironments,renderScene,forgetScene,
+ return{device,format,features,maxTexture:device.limits.maxTextureDimension2D,upload,destroy,frame,present,submit,release,forget,trimEnvironments,renderScene,prepareScene,forgetScene,
   get sceneContexts(){return sceneTargets.size;},get environmentBytes(){return [...environments.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0);},get attachmentBytes(){return[...targets.values()].reduce((sum,t)=>sum+t.bytes,0)+(atlas?.bytes??0)+[...sceneTargets].reduce((sum,t)=>sum+(t.bytes??0),0);},get validationErrors(){return validationErrors;}};
 }

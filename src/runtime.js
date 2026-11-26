@@ -704,6 +704,8 @@ addEventListener('resize',()=>{for(const el of elements)enqueue(el);});
 export async function createImg3dScene(canvas,{lighting,signal,onDeviceLost}={}){
  const chosen=await backend();if(!chosen)throw Error('Image3D scenes require WebGPU');
  signal?.throwIfAborted();
+ await chosen.prepareScene();
+ signal?.throwIfAborted();
  const abort=new AbortController(),record={urls:new Set(),lighting:normalizeLighting(lighting),onDeviceLost},target={};
  scenes.add(record);
  let owner=chosen;const gpuFrames=new Set();
@@ -733,6 +735,7 @@ export async function createImg3dScene(canvas,{lighting,signal,onDeviceLost}={})
  async function draw(settings){
   if(disposed||document.hidden)return false;lastSettings=settings;
   const backendApi=await backend();if(!backendApi)throw Error('Image3D scenes require WebGPU');
+  if(owner!==backendApi)await backendApi.prepareScene();
   if(instances.some(item=>item&&(item.asset.disposed||item.asset.api!==backendApi)))await load(placements);
   if(disposed)return false;
   if(owner!==backendApi){owner.forgetScene(target);target.device=null;owner=backendApi;}
