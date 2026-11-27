@@ -8,9 +8,9 @@ import {exportImg3d} from './export.mjs';
 import {validate} from './validate.mjs';
 const args=process.argv.slice(2),option=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
 const config=JSON.parse(await readFile(option('--inputs','tools/assets.json'),'utf8')),directory=resolve(option('--output','.local/matrix'));
-const requested=option('--models',config.models.map(m=>m.id).join(',')).split(','),sizes=option('--sizes',config.sizes.join(',')).split(',').map(Number);
+const requested=option('--models',config.models.map(m=>m.id).join(',')).split(','),sizes=option('--sizes','').split(',').filter(Boolean).map(Number);
 const profiles=option('--profiles','pbr,pbr-xuastc,baked,baked-xuastc').split(','),run=promisify(execFile),results=[];
-for(const model of config.models.filter(m=>requested.includes(m.id)))for(const size of sizes){
+for(const model of config.models.filter(m=>requested.includes(m.id)))for(const size of sizes.length?sizes:Object.keys(model.captures).map(Number)){
  const capture=model.captures[size];if(!capture)throw Error(`No ${size} capture for ${model.id}`);
  const bytes=await readFixture(capture.file,{sha256:capture.sha256}),native=new Map();
  for(const profile of profiles){

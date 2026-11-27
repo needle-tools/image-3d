@@ -1,7 +1,6 @@
 {
   "fixture": "chronograph-watch.glb",
-  "sha256": "f1c4668df08ef6cd262fd5f8d577255a15f6337268a151ae9dab8b7a5ed7f0bd",
-  "bytes": 644644,
-  "source": "https://cloud.needle.tools/edit/489dfa7bf52a46459a977e74d63b6b2e?vid=489dfa7bf52a46459a977e74d63b6b2e",
-  "description": "Exact canonical source from ChronographWatch_optimized_report.zip: a curved strap loop, layered case, hands, clasp and transparent face. Captures must avoid one whole-loop carrier and excessive thin slices in fitted mode. The report itself used Basic card, which intentionally skips decomposition."
+  "source": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/ChronographWatch/glTF-Binary/ChronographWatch.glb",
+  "sha256": "8e875fcd83efb433afed9ef1c18b2c2b2e075e2bf48371cadfd2a3cf529f1aef",
+  "bytes": 7446368
 }

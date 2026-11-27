@@ -1,8 +1,4 @@
 {
-  "sizes": [
-    512,
-    1024
-  ],
   "models": [
     {
       "id": "owl",
@@ -20,15 +16,15 @@
     },
     {
       "id": "watch",
-      "label": "Watch",
+      "label": "Chronograph Watch",
       "captures": {
         "512": {
           "file": "tests/fixtures/captures/watch-512.glb",
-          "sha256": "63ea8b858d9cf16c4ce7e99b938dcf8f5517f8e56e24b315f34b1913e92d6365"
+          "sha256": "573bf5a9f39fa529816e1a9c5280d3b2bd30970a1ed5971b1afebc05d849bb41"
         },
         "1024": {
           "file": "tests/fixtures/captures/watch-1024.glb",
-          "sha256": "8d90ede192b9fd39087d6598dea8d009c18764cb686b9efb0e6b708af32979f9"
+          "sha256": "b811320967137de716e4a5f66371cd3f48bb25a03c5e78706234094a9653af6e"
         }
       }
     },
@@ -71,6 +67,80 @@
         "1024": {
           "file": "tests/fixtures/captures/boat-1024.glb",
           "sha256": "f4a5759dd1d2cee61243351d530ad825ec550ce7d407feaa42caa16070ff5100"
+        }
+      }
+    },
+    {
+      "id": "handbag",
+      "label": "Monogram Handbag",
+      "captures": {
+        "256": {
+          "file": "tests/fixtures/captures/handbag-256.glb",
+          "sha256": "775296f327ae5bb4f2b570344c9c3a7823d2c8b68699d113269fb4b403d076a0"
+        },
+        "512": {
+          "file": "tests/fixtures/captures/handbag-512.glb",
+          "sha256": "b44821b8c491c4b4cc64c2fa3ef9d119f46ba1a9efefa76b8090b7c7a751191c"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/handbag-1024.glb",
+          "sha256": "bc9353f70ecc69902970a3ee553829d1167c168fb6b4f5efa90800073e10292b"
+        }
+      }
+    },
+    {
+      "id": "bike",
+      "label": "Carbon Frame Bike",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/bike-512.glb",
+          "sha256": "53e02615d8dcfe0158aed97781bc449edddf84d75623f495a82db547d2c07f32"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/bike-1024.glb",
+          "sha256": "6aed65060e5b3d8e3f176c88fabbcad43534a06f5b83d7119bec60a27d9c4b69"
+        }
+      }
+    },
+    {
+      "id": "chess",
+      "label": "A Beautiful Game",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/chess-512.glb",
+          "sha256": "93cf72e4466367edc764ca146ba7be52bb5ed2e363b8e12468536fcb36fdfe04"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/chess-1024.glb",
+          "sha256": "2c41d4d332ce85928b39fe03269eaeddc67c68ac2a01a8a8264419a2c69d9ec6"
+        }
+      }
+    },
+    {
+      "id": "knight",
+      "label": "The Forgotten Knight",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/knight-512.glb",
+          "sha256": "962543da4f571cacd4462a3355d5f4631301d4c3ba68bf264b264af34ee41069"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/knight-1024.glb",
+          "sha256": "cf211e7fc1f4f344fbd6847a261d8508d78657c4caa96678ac32ccb8724dfc35"
+        }
+      }
+    },
+    {
+      "id": "motorhome",
+      "label": "GMC Motorhome",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/motorhome-512.glb",
+          "sha256": "aca52317e8fe82f5b2b60c4cd47b09325e68e0b392a2021b41a3f91ccbceb305"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/motorhome-1024.glb",
+          "sha256": "8eeda38365f4f63f3830a4e1fba8bd2a68e73174f265d958ad9857a8c2bda093"
         }
       }
     }

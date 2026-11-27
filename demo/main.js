@@ -95,7 +95,7 @@ const displayObserver=new IntersectionObserver(entries=>{for(const entry of entr
 document.addEventListener('visibilitychange',animate);
 function renderMeasurements(){
  const [m,r,v]=selected();byId('metrics').replaceChildren();
- const rows=many.checked?models.map(model=>{const src=tiles.find(el=>el.dataset.model===model.id)?.currentSrc,res=resolution.value==='auto'?model.resolutions.find(r=>r.variants.some(v=>src?.endsWith('/'+v.src)||src?.endsWith('/'+v.image?.src)))??model.resolutions[0]:model.resolutions.find(res=>res.size===r.size);return{...res.variants.find(item=>item.id===v.id),name:model.label};}):r.variants;
+ const rows=many.checked?models.map(model=>{const src=tiles.find(el=>el.dataset.model===model.id)?.currentSrc,res=resolution.value==='auto'?model.resolutions.find(r=>r.variants.some(v=>src?.endsWith('/'+v.src)||src?.endsWith('/'+v.image?.src)))??model.resolutions[0]:model.resolutions.find(res=>res.size===r.size)??model.resolutions[0];return{...res.variants.find(item=>item.id===v.id),name:model.label};}):r.variants;
  byId('metrics').closest('table').querySelector('th').textContent=many.checked?'Model':'Appearance';
  for(const row of rows){const tr=document.createElement('tr'),extra=row.image?row.image.bytes-row.assetBytes:0;tr.className=!many.checked&&row.id===v.id?'selected':'';for(const text of [row.name,row.image?.effectiveWidth?row.image.effectiveWidth+' px':'—',bytes(row.assetBytes+extra),bytes(row.totalGzip+extra),row.imageBytes?bytes(row.imageBytes)+' RGBA (all frames)':bytes(row.textureBytes)+' '+row.textureFormat.toUpperCase(),row.codecPsnr.toFixed(1)+' dB',row.lighting?row.lighting.meanPsnr.toFixed(1)+' dB':'—']){const td=document.createElement('td');td.textContent=text;tr.append(td);}byId('metrics').append(tr);}
 }
@@ -112,7 +112,7 @@ async function update(){
  reference.disabled=isWebp||many.checked||moving||useHover;
  const compare=comparing();
  byId('error').hidden=true;view.max=r.turntable.frames-1;
- const gridModels=models.map(m=>{const match=m.resolutions.find(res=>res.size===r.size)?.variants.find(item=>item.id===v.id);return{model:m,variant:match};});
+ const gridModels=models.map(m=>{const match=(m.resolutions.find(res=>res.size===r.size)??m.resolutions[0]).variants.find(item=>item.id===v.id);return{model:m,variant:match};});
  if(many.checked&&gridModels.some(item=>!item.variant))throw Error('The selected appearance and resolution are not available for every model');
  renderMeasurements();
  if(isWebp||compare){turntableModule??=import('./runtime/turntable.js');await turntableModule;if(stamp!==generation)return;}

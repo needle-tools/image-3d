@@ -462,7 +462,8 @@
       "meanPsnr": 14.69088215178747
     },
     "referencePrefix": "watch-512/reference/source-",
-    "losslessBaked": "watch-512/baked-lossless.i3d"
+    "losslessBaked": "watch-512/baked-lossless.i3d",
+    "liveCapture": "watch-512/live.i3d"
   },
   "watch-1024": {
     "views": [
@@ -617,7 +618,8 @@
       "meanPsnr": 15.07179733900866
     },
     "referencePrefix": "watch-1024/reference/source-",
-    "losslessBaked": "watch-1024/baked-lossless.i3d"
+    "losslessBaked": "watch-1024/baked-lossless.i3d",
+    "liveCapture": "watch-1024/live.i3d"
   },
   "decor-512": {
     "views": [

@@ -24,12 +24,12 @@ test('every refreshed poster preserves capture payloads and measured raster dime
   assert.equal(framed.images.length,original.images.length);for(let i=0;i<framed.images.length;i++)assert.deepEqual(framed.images[i].bytes,original.images[i].bytes,'Poster refresh changed 3D texture data');
   if(resolution.size===1024)assert(Math.max(image.width,image.height)>=1024,model.id+' cannot fill a 512 CSS-pixel Retina image');checked++;
  }
- assert.equal(checked,40);
+ assert.equal(checked,84);
 });
 
 // Compare like-for-like lossy encodes to isolate raster sizing from codec loss.
 // The source-quality oracle remains independent of this poster handoff check.
-test('native Retina posters match the live capture at physical resolution across all models',{timeout:180000},async()=>{
+test('native Retina posters match the live capture at physical resolution across all models',{timeout:300000},async()=>{
  const server=createServer(async(req,res)=>{try{
   if(req.url==='/'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><style>body{margin:0}picture{display:block;position:relative}img{display:block;width:100%;height:100%;object-fit:contain}</style><picture><img></picture><script type="module">import{enhanceImage}from"/runtime/img-3d-xuastc.js";import{loadStudio,studioLighting}from"/runtime/lighting.js";window.studio=studioLighting(await loadStudio());window.controller=enhanceImage(document.querySelector("img"));</script>');return;}
   const path=resolve(root,'.'+req.url);if(!path.startsWith(root+'/'))throw Error('Path');res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':extname(path)==='.webp'?'image/webp':'application/octet-stream');res.end(await readFile(path));
@@ -52,6 +52,6 @@ test('native Retina posters match the live capture at physical resolution across
    }
    console.log(label,{rasterPsnr:quality.renderPsnr,codecPsnr:codec.renderPsnr});checked++;
   }
-  assert.equal(checked,40);assert.equal(await page.evaluate(()=>customElements.get('img-3d').statistics.validationErrors),0);console.log({checked,minRetinaPsnr:minPsnr,minCodecPsnr});
+  assert.equal(checked,84);assert.equal(await page.evaluate(()=>customElements.get('img-3d').statistics.validationErrors),0);console.log({checked,minRetinaPsnr:minPsnr,minCodecPsnr});
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 });

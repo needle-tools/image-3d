@@ -45,7 +45,8 @@ test('one comparison page switches models, resolutions, appearance, references a
   const catalog=JSON.parse(await readFile(resolve(root,'comparison.json'),'utf8'));
   const viewerBytes=gzipSync(await readFile('dist/img-3d.js')).length;
   assert(catalog.every(m=>m.resolutions.every(r=>r.variants.filter(v=>v.id!=='webp'&&!v.id.endsWith('xuastc')).every(v=>v.runtimeGzip===viewerBytes))),'Comparison uses an outdated viewer size');
-  assert.equal(catalog.length,5,'Comparison is missing requested Cloud models');
+  assert.deepEqual(catalog.map(m=>m.id).sort(),['bike','boat','chess','decor','handbag','knight','motorcycle','motorhome','owl','watch']);
+  assert.deepEqual(catalog.find(m=>m.id==='handbag').resolutions.map(r=>r.size),[256,512,1024]);
   let count=0;
   for(const model of catalog)for(const resolution of model.resolutions)for(const variant of resolution.variants){
    await page.getByLabel('Model',{exact:true}).selectOption(model.id);
@@ -65,7 +66,7 @@ test('one comparison page switches models, resolutions, appearance, references a
     const before=await page.evaluate(()=>document.querySelector('#viewer').yaw),box=await page.locator('#viewer canvas').boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+30,box.y+box.height/2);await page.mouse.up();await page.waitForFunction(before=>Math.abs(document.querySelector('#viewer').yaw-before)>.1,before);assert.equal(await page.evaluate(()=>document.querySelector('#viewer').yaw===document.querySelector('#referenceViewer').frame*Math.PI/16),true,'Dragging the 3D pane did not match the WebP frame');assert.equal(await page.getByLabel('Reference',{exact:true}).isChecked(),true);assert.equal(await page.evaluate(()=>document.querySelector('#viewer').pitch),.2);
    }
   }
-  assert.equal(count,50,'Expected5 models ×2 sizes ×5 appearances');
+  assert.equal(count,105,'Expected five appearances for each of the 21 captures');
   assert.equal(await page.locator('#turntable').isVisible(),true);assert.equal(await page.getByLabel('Move light',{exact:true}).isVisible(),false);
   const frame=await page.evaluate(()=>document.querySelector('#turntable').frame);await page.locator('#turntable img').press('ArrowRight');await page.waitForFunction(frame=>document.querySelector('#turntable').frame===(frame+1)%32,frame);
   assert.equal(await page.evaluate(()=>document.querySelector('#turntable').pitch),.2);
@@ -158,6 +159,6 @@ test('one comparison page switches models, resolutions, appearance, references a
   await page.getByLabel('Reference',{exact:true}).uncheck();await page.locator('#viewer canvas').press('ArrowRight');await page.getByRole('button',{name:'Reset view'}).click();assert.equal(await page.evaluate(()=>document.querySelector('#viewer').yaw),.55);
   await page.getByLabel('Appearance',{exact:true}).selectOption('baked');await page.waitForFunction(()=>document.querySelector('#viewer')?.data?.appearance==='baked');
   await page.screenshot({path:resolve(screenshots,'comparison.png')});assert.deepEqual(errors,[]);assert.deepEqual(missing,[],'Demo requested missing assets');
-  console.log('One page:50 appearances, 120-item mixed grids with shared settings and adjustable sizes, cursor following, solo drag, release/cancel and scrolling passed.');
+  console.log(`Passed all ${count} appearances and the 120-item mixed grids.`);
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 });

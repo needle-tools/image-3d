@@ -14,7 +14,7 @@ test('compact studio lighting is closer to baked studio than the hemisphere appr
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/'){
    const model=url.searchParams.get('model');assert(['owl','watch'].includes(model));res.setHeader('Content-Type','text/html');
-   res.end(`<!doctype html><style>img-3d{width:256px;height:256px}</style><img-3d id="live" src="/${model}-512-i3d/live.i3d"></img-3d><img-3d id="baked" src="/quality/${model}-512/baked-lossless.i3d"></img-3d><script type="module">import '/runtime/img-3d.js';import{loadStudio,studioLighting}from'/runtime/lighting.js';window.studio=await loadStudio();window.applyStudio=()=>document.querySelector('#live').lighting=studioLighting(studio);</script>`);return;
+   res.end(`<!doctype html><style>img-3d{width:256px;height:256px}</style><img-3d id="live" src="${model==='watch'?'/quality/watch-512/live.i3d':'/owl-512-i3d/live.i3d'}"></img-3d><img-3d id="baked" src="/quality/${model}-512/baked-lossless.i3d"></img-3d><script type="module">import '/runtime/img-3d.js';import{loadStudio,studioLighting}from'/runtime/lighting.js';window.studio=await loadStudio();window.applyStudio=()=>document.querySelector('#live').lighting=studioLighting(studio);</script>`);return;
   }
   const fixture=url.pathname.startsWith('/quality/'),base=fixture?quality:root,path=resolve(base,'.'+(fixture?url.pathname.slice(8):url.pathname));if(!path.startsWith(base+'/'))throw Error('Path');
   res.setHeader('Content-Type',extname(path)==='.js'?'text/javascript':'application/octet-stream');res.end(await readFile(path));
