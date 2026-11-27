@@ -37,7 +37,7 @@ else for(const m of state.grid?models:[models.find(m=>m.id===state.model)]){
 }
 
 for(const m of models)model.add(new Option(m.label,m.id));
-function controls(){const m=models.find(m=>m.id===model.value),size=resolution.value,mode=appearance.value;resolution.replaceChildren(...m.resolutions.map(r=>new Option(String(r.size),String(r.size))),...(mode==='webp'?[]:[new Option('Auto','auto')]));if(size==='auto'&&mode!=='webp'||m.resolutions.some(r=>String(r.size)===size))resolution.value=size;const r=m.resolutions.find(r=>String(r.size)===resolution.value)??m.resolutions[0];appearance.replaceChildren(...r.variants.map(v=>new Option(v.name,v.id)));appearance.value=r.variants.some(v=>v.id===mode)?mode:'baked';}
+function controls(){const m=models.find(m=>m.id===model.value),size=resolution.value,mode=m.resolutions.some(r=>r.variants.some(v=>v.id===appearance.value))?appearance.value:'baked';resolution.replaceChildren(...m.resolutions.map(r=>new Option(String(r.size),String(r.size))),...(mode==='webp'?[]:[new Option('Auto','auto')]));if(size==='auto'&&mode!=='webp'||m.resolutions.some(r=>String(r.size)===size))resolution.value=size;const r=m.resolutions.find(r=>String(r.size)===resolution.value)??m.resolutions[0];appearance.replaceChildren(...r.variants.map(v=>new Option(v.name,v.id)));appearance.value=r.variants.some(v=>v.id===mode)?mode:'baked';}
 function restore(state){
  model.value=state.model;controls();resolution.value=String(state.resolution);controls();appearance.value=state.appearance;
  native.checked=state.native;many.checked=state.grid;light.checked=state.light;reference.checked=state.reference;hover.checked=state.hover;follow.checked=state.follow;fixed.checked=state.fixed;gridSize.value=state.size;byId('measurements').open=state.measurements;resizeGrid();
@@ -93,9 +93,17 @@ function animate(){
 }
 const displayObserver=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.target===stage)stageVisible=entry.isIntersecting;else gridVisible=entry.isIntersecting;}animate();});displayObserver.observe(stage);displayObserver.observe(grid);
 document.addEventListener('visibilitychange',animate);
+function gridVariants(size,mode,loaded=false){
+ return models.flatMap(model=>{
+  const src=loaded&&tiles.find(el=>el.dataset.model===model.id)?.currentSrc;
+  const resolution=(src&&model.resolutions.find(r=>r.variants.some(v=>src.endsWith('/'+v.image?.src)||src.endsWith('/'+v.src))))||model.resolutions.find(r=>r.size===size)||model.resolutions[0];
+  const variant=resolution.variants.find(v=>v.id===mode);
+  return variant?[{model,variant}]:[];
+ });
+}
 function renderMeasurements(){
  const [m,r,v]=selected();byId('metrics').replaceChildren();
- const rows=many.checked?models.map(model=>{const src=tiles.find(el=>el.dataset.model===model.id)?.currentSrc,res=resolution.value==='auto'?model.resolutions.find(r=>r.variants.some(v=>src?.endsWith('/'+v.src)||src?.endsWith('/'+v.image?.src)))??model.resolutions[0]:model.resolutions.find(res=>res.size===r.size)??model.resolutions[0];return{...res.variants.find(item=>item.id===v.id),name:model.label};}):r.variants;
+ const rows=many.checked?gridVariants(r.size,v.id,resolution.value==='auto').map(({model,variant})=>({...variant,name:model.label})):r.variants;
  byId('metrics').closest('table').querySelector('th').textContent=many.checked?'Model':'Appearance';
  for(const row of rows){const tr=document.createElement('tr'),extra=row.image?row.image.bytes-row.assetBytes:0;tr.className=!many.checked&&row.id===v.id?'selected':'';for(const text of [row.name,row.image?.effectiveWidth?row.image.effectiveWidth+' px':'—',bytes(row.assetBytes+extra),bytes(row.totalGzip+extra),row.imageBytes?bytes(row.imageBytes)+' RGBA (all frames)':bytes(row.textureBytes)+' '+row.textureFormat.toUpperCase(),row.codecPsnr.toFixed(1)+' dB',row.lighting?row.lighting.meanPsnr.toFixed(1)+' dB':'—']){const td=document.createElement('td');td.textContent=text;tr.append(td);}byId('metrics').append(tr);}
 }
@@ -109,11 +117,10 @@ async function update(){
  hover.disabled=isWebp||many.checked;
  const useHover=hover.checked&&!hover.disabled,moving=light.checked&&v.id.startsWith('pbr')&&!many.checked;
  byId('actions').hidden=!useHover;
- reference.disabled=isWebp||many.checked||moving||useHover;
+ reference.disabled=!r.turntable||isWebp||many.checked||moving||useHover;
  const compare=comparing();
- byId('error').hidden=true;view.max=r.turntable.frames-1;
- const gridModels=models.map(m=>{const match=(m.resolutions.find(res=>res.size===r.size)??m.resolutions[0]).variants.find(item=>item.id===v.id);return{model:m,variant:match};});
- if(many.checked&&gridModels.some(item=>!item.variant))throw Error('The selected appearance and resolution are not available for every model');
+ byId('error').hidden=true;if(r.turntable)view.max=r.turntable.frames-1;
+ const gridModels=many.checked?gridVariants(r.size,v.id):[];
  renderMeasurements();
  if(isWebp||compare){turntableModule??=import('./runtime/turntable.js');await turntableModule;if(stamp!==generation)return;}
  if(!isWebp){runtime??=import(v.id.endsWith('xuastc')?'./runtime/img-3d-xuastc.js':'./runtime/img-3d.js');runtimeModule=await runtime;if(stamp!==generation)return;}
@@ -122,7 +129,7 @@ async function update(){
  if(v.id.startsWith('pbr')){lightingModule??=await import('./runtime/lighting.js');studio??=await lightingModule.loadStudio();if(stamp!==generation)return;}
  const liveLighting=v.id.startsWith('pbr')?lightingModule.studioLighting(studio):null;
  stage.hidden=many.checked;grid.hidden=!many.checked;light.disabled=!v.id.startsWith('pbr');byId('viewControls').hidden=!compare;
- gridSize.disabled=follow.disabled=!many.checked;model.disabled=many.checked;model.title=many.checked?'Grid shows every model':'';
+ gridSize.disabled=follow.disabled=!many.checked;model.disabled=many.checked;model.title=many.checked?'Grid shows models with this appearance':'';
  stage.classList.toggle('reference',compare);byId('referenceFigure').hidden=!compare;
  const useNative=native.checked&&!native.disabled;viewer.hidden=isWebp||useNative;turntable.hidden=!isWebp;nativePicture.hidden=!useNative;
  if(useNative){configureImage(m,v.id,resolution.value);if(!nativeController){nativeController=runtimeModule.enhanceImage(nativePicture);wireGestures(nativeController.element);Object.assign(nativeController.element,{yaw:oldPose.yaw,pitch:oldPose.pitch,distance:oldPose.distance});}el=nativeController.element;}else if(nativeController){if(!pendingPose)Object.assign(viewer,{yaw:nativeController.element.yaw,pitch:nativeController.element.pitch,distance:nativeController.element.distance});nativeController.disconnect();nativeController=null;nativeImage.removeAttribute('src');nativeImage.removeAttribute('srcset');}

@@ -2427,5 +2427,757 @@
         }
       }
     ]
+  },
+  {
+    "id": "sneaker",
+    "label": "Materials Variants Shoe",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "sneaker-512-i3d/live.i3d",
+            "assetBytes": 399624,
+            "runtimeGzip": 47541,
+            "totalGzip": 447597,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 45.460830341904064,
+            "textureBytes": 4806933,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "sneaker-512-i3d/live.webp",
+              "width": 696,
+              "height": 464,
+              "effectiveWidth": 696,
+              "bytes": 421520,
+              "posterBytes": 21888
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "sneaker-512-i3d/live-xuastc.i3d",
+            "assetBytes": 422251,
+            "runtimeGzip": 197026,
+            "totalGzip": 619710,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 44.14049249672021,
+            "block": "4x4",
+            "textureBytes": 4020501,
+            "textureFormat": "astc",
+            "image": {
+              "src": "sneaker-512-i3d/live-xuastc.webp",
+              "width": 696,
+              "height": 464,
+              "effectiveWidth": 696,
+              "bytes": 443876,
+              "posterBytes": 21616
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "sneaker-512-i3d/baked.i3d",
+            "assetBytes": 240373,
+            "runtimeGzip": 47541,
+            "totalGzip": 288345,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 44.73363007045366,
+            "textureBytes": 3234068,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "sneaker-512-i3d/baked.webp",
+              "width": 696,
+              "height": 464,
+              "effectiveWidth": 696,
+              "bytes": 262386,
+              "posterBytes": 22004
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "sneaker-512-i3d/baked-xuastc.i3d",
+            "assetBytes": 260745,
+            "runtimeGzip": 197026,
+            "totalGzip": 458205,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 40.90430320111342,
+            "block": "4x4",
+            "textureBytes": 2447636,
+            "textureFormat": "astc",
+            "image": {
+              "src": "sneaker-512-i3d/baked-xuastc.webp",
+              "width": 696,
+              "height": 464,
+              "effectiveWidth": 696,
+              "bytes": 282670,
+              "posterBytes": 21916
+            }
+          }
+        ]
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "sneaker-1024-i3d/live.i3d",
+            "assetBytes": 1201672,
+            "runtimeGzip": 47541,
+            "totalGzip": 1249646,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 46.62548731573911,
+            "textureBytes": 19224853,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "sneaker-1024-i3d/live.webp",
+              "width": 1424,
+              "height": 952,
+              "effectiveWidth": 1424,
+              "bytes": 1269736,
+              "posterBytes": 68056
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "sneaker-1024-i3d/live-xuastc.i3d",
+            "assetBytes": 1299857,
+            "runtimeGzip": 197026,
+            "totalGzip": 1497318,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 45.04897313342206,
+            "block": "4x4",
+            "textureBytes": 16079125,
+            "textureFormat": "astc",
+            "image": {
+              "src": "sneaker-1024-i3d/live-xuastc.webp",
+              "width": 1424,
+              "height": 952,
+              "effectiveWidth": 1424,
+              "bytes": 1367534,
+              "posterBytes": 67668
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "sneaker-1024-i3d/baked.i3d",
+            "assetBytes": 753898,
+            "runtimeGzip": 47541,
+            "totalGzip": 801870,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 45.74842059148178,
+            "textureBytes": 12933396,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "sneaker-1024-i3d/baked.webp",
+              "width": 1424,
+              "height": 952,
+              "effectiveWidth": 1424,
+              "bytes": 825172,
+              "posterBytes": 71266
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "sneaker-1024-i3d/baked-xuastc.i3d",
+            "assetBytes": 853780,
+            "runtimeGzip": 197026,
+            "totalGzip": 1051240,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 42.13911971830005,
+            "block": "4x4",
+            "textureBytes": 9787668,
+            "textureFormat": "astc",
+            "image": {
+              "src": "sneaker-1024-i3d/baked-xuastc.webp",
+              "width": 1424,
+              "height": 952,
+              "effectiveWidth": 1424,
+              "bytes": 924406,
+              "posterBytes": 70618
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "v8-engine",
+    "label": "V8 Engine",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "v8-engine-512-i3d/live.i3d",
+            "assetBytes": 281595,
+            "runtimeGzip": 47541,
+            "totalGzip": 329566,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 72.11363154868313,
+            "textureBytes": 4807253,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "v8-engine-512-i3d/live.webp",
+              "width": 756,
+              "height": 396,
+              "effectiveWidth": 756,
+              "bytes": 318098,
+              "posterBytes": 36494
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "v8-engine-512-i3d/live-xuastc.i3d",
+            "assetBytes": 301939,
+            "runtimeGzip": 197026,
+            "totalGzip": 499398,
+            "codec": "xuastc",
+            "quality": 100,
+            "codecPsnr": 57.52622493232808,
+            "block": "4x4",
+            "textureBytes": 4020821,
+            "textureFormat": "astc",
+            "image": {
+              "src": "v8-engine-512-i3d/live-xuastc.webp",
+              "width": 756,
+              "height": 396,
+              "effectiveWidth": 756,
+              "bytes": 338434,
+              "posterBytes": 36486
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "v8-engine-512-i3d/baked.i3d",
+            "assetBytes": 210041,
+            "runtimeGzip": 47541,
+            "totalGzip": 258012,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 51.23699000173132,
+            "textureBytes": 3234388,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "v8-engine-512-i3d/baked.webp",
+              "width": 756,
+              "height": 396,
+              "effectiveWidth": 756,
+              "bytes": 242986,
+              "posterBytes": 32936
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "v8-engine-512-i3d/baked-xuastc.i3d",
+            "assetBytes": 254936,
+            "runtimeGzip": 197026,
+            "totalGzip": 452396,
+            "codec": "xuastc",
+            "quality": 100,
+            "codecPsnr": 52.98671621308472,
+            "block": "4x4",
+            "textureBytes": 2447956,
+            "textureFormat": "astc",
+            "image": {
+              "src": "v8-engine-512-i3d/baked-xuastc.webp",
+              "width": 756,
+              "height": 396,
+              "effectiveWidth": 756,
+              "bytes": 287910,
+              "posterBytes": 32966
+            }
+          }
+        ]
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "v8-engine-1024-i3d/live.i3d",
+            "assetBytes": 764864,
+            "runtimeGzip": 47541,
+            "totalGzip": 812836,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 71.64260675406759,
+            "textureBytes": 19225173,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "v8-engine-1024-i3d/live.webp",
+              "width": 1548,
+              "height": 816,
+              "effectiveWidth": 1548,
+              "bytes": 866328,
+              "posterBytes": 101456
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "v8-engine-1024-i3d/live-xuastc.i3d",
+            "assetBytes": 810316,
+            "runtimeGzip": 197026,
+            "totalGzip": 1007775,
+            "codec": "xuastc",
+            "quality": 100,
+            "codecPsnr": 61.22265065057515,
+            "block": "4x4",
+            "textureBytes": 16079445,
+            "textureFormat": "astc",
+            "image": {
+              "src": "v8-engine-1024-i3d/live-xuastc.webp",
+              "width": 1548,
+              "height": 816,
+              "effectiveWidth": 1548,
+              "bytes": 911858,
+              "posterBytes": 101534
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "v8-engine-1024-i3d/baked.i3d",
+            "assetBytes": 602779,
+            "runtimeGzip": 47541,
+            "totalGzip": 650751,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 52.38415317019743,
+            "textureBytes": 12933716,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "v8-engine-1024-i3d/baked.webp",
+              "width": 1548,
+              "height": 816,
+              "effectiveWidth": 1548,
+              "bytes": 699276,
+              "posterBytes": 96488
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "v8-engine-1024-i3d/baked-xuastc.i3d",
+            "assetBytes": 769251,
+            "runtimeGzip": 197026,
+            "totalGzip": 966710,
+            "codec": "xuastc",
+            "quality": 100,
+            "codecPsnr": 55.62918286196335,
+            "block": "4x4",
+            "textureBytes": 9787988,
+            "textureFormat": "astc",
+            "image": {
+              "src": "v8-engine-1024-i3d/baked-xuastc.webp",
+              "width": 1548,
+              "height": 816,
+              "effectiveWidth": 1548,
+              "bytes": 865982,
+              "posterBytes": 96722
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "anesthesia-machine",
+    "label": "Anesthesia Machine",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "anesthesia-machine-512-i3d/live.i3d",
+            "assetBytes": 137587,
+            "runtimeGzip": 47541,
+            "totalGzip": 185558,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 51.537812855160126,
+            "textureBytes": 4807893,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "anesthesia-machine-512-i3d/live.webp",
+              "width": 452,
+              "height": 608,
+              "effectiveWidth": 452,
+              "bytes": 159490,
+              "posterBytes": 21894
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "anesthesia-machine-512-i3d/live-xuastc.i3d",
+            "assetBytes": 172646,
+            "runtimeGzip": 197026,
+            "totalGzip": 370105,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 52.12414374684586,
+            "block": "4x4",
+            "textureBytes": 4021461,
+            "textureFormat": "astc",
+            "image": {
+              "src": "anesthesia-machine-512-i3d/live-xuastc.webp",
+              "width": 452,
+              "height": 608,
+              "effectiveWidth": 452,
+              "bytes": 194590,
+              "posterBytes": 21936
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "anesthesia-machine-512-i3d/baked.i3d",
+            "assetBytes": 92043,
+            "runtimeGzip": 47541,
+            "totalGzip": 140014,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 50.18962531362169,
+            "textureBytes": 3235028,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "anesthesia-machine-512-i3d/baked.webp",
+              "width": 452,
+              "height": 608,
+              "effectiveWidth": 452,
+              "bytes": 113652,
+              "posterBytes": 21600
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "anesthesia-machine-512-i3d/baked-xuastc.i3d",
+            "assetBytes": 129315,
+            "runtimeGzip": 197026,
+            "totalGzip": 326774,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 48.436366567407354,
+            "block": "4x4",
+            "textureBytes": 2448596,
+            "textureFormat": "astc",
+            "image": {
+              "src": "anesthesia-machine-512-i3d/baked-xuastc.webp",
+              "width": 452,
+              "height": 608,
+              "effectiveWidth": 452,
+              "bytes": 151010,
+              "posterBytes": 21686
+            }
+          }
+        ]
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "anesthesia-machine-1024-i3d/live.i3d",
+            "assetBytes": 387056,
+            "runtimeGzip": 47541,
+            "totalGzip": 435028,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 52.42766495231572,
+            "textureBytes": 19225813,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "anesthesia-machine-1024-i3d/live.webp",
+              "width": 916,
+              "height": 1232,
+              "effectiveWidth": 916,
+              "bytes": 441680,
+              "posterBytes": 54616
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "anesthesia-machine-1024-i3d/live-xuastc.i3d",
+            "assetBytes": 498914,
+            "runtimeGzip": 197026,
+            "totalGzip": 696374,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 54.73796095407738,
+            "block": "4x4",
+            "textureBytes": 16080085,
+            "textureFormat": "astc",
+            "image": {
+              "src": "anesthesia-machine-1024-i3d/live-xuastc.webp",
+              "width": 916,
+              "height": 1232,
+              "effectiveWidth": 916,
+              "bytes": 554270,
+              "posterBytes": 55348
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "anesthesia-machine-1024-i3d/baked.i3d",
+            "assetBytes": 242107,
+            "runtimeGzip": 47541,
+            "totalGzip": 290079,
+            "codec": "webp",
+            "quality": 95,
+            "codecPsnr": 44.980262899554134,
+            "textureBytes": 12934356,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "anesthesia-machine-1024-i3d/baked.webp",
+              "width": 916,
+              "height": 1232,
+              "effectiveWidth": 916,
+              "bytes": 301156,
+              "posterBytes": 59040
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "anesthesia-machine-1024-i3d/baked-xuastc.i3d",
+            "assetBytes": 372311,
+            "runtimeGzip": 197026,
+            "totalGzip": 569770,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 49.91624263519009,
+            "block": "4x4",
+            "textureBytes": 9788628,
+            "textureFormat": "astc",
+            "image": {
+              "src": "anesthesia-machine-1024-i3d/baked-xuastc.webp",
+              "width": 916,
+              "height": 1232,
+              "effectiveWidth": 916,
+              "bytes": 431306,
+              "posterBytes": 58986
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "surgical-robot",
+    "label": "Surgical Robot",
+    "resolutions": [
+      {
+        "size": 512,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "surgical-robot-512-i3d/live.i3d",
+            "assetBytes": 302945,
+            "runtimeGzip": 47541,
+            "totalGzip": 350917,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 51.78821609469031,
+            "textureBytes": 5856789,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "surgical-robot-512-i3d/live.webp",
+              "width": 544,
+              "height": 688,
+              "effectiveWidth": 544,
+              "bytes": 331840,
+              "posterBytes": 28886
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "surgical-robot-512-i3d/live-xuastc.i3d",
+            "assetBytes": 346202,
+            "runtimeGzip": 197026,
+            "totalGzip": 543661,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 52.743218855104956,
+            "block": "4x4",
+            "textureBytes": 4283925,
+            "textureFormat": "astc",
+            "image": {
+              "src": "surgical-robot-512-i3d/live-xuastc.webp",
+              "width": 544,
+              "height": 688,
+              "effectiveWidth": 544,
+              "bytes": 375048,
+              "posterBytes": 28838
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "surgical-robot-512-i3d/baked.i3d",
+            "assetBytes": 190801,
+            "runtimeGzip": 47541,
+            "totalGzip": 238772,
+            "codec": "webp",
+            "quality": 95,
+            "codecPsnr": 44.67509636173708,
+            "textureBytes": 3235348,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "surgical-robot-512-i3d/baked.webp",
+              "width": 544,
+              "height": 688,
+              "effectiveWidth": 544,
+              "bytes": 215918,
+              "posterBytes": 25108
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "surgical-robot-512-i3d/baked-xuastc.i3d",
+            "assetBytes": 238074,
+            "runtimeGzip": 197026,
+            "totalGzip": 435534,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 46.93936929699919,
+            "block": "4x4",
+            "textureBytes": 2448916,
+            "textureFormat": "astc",
+            "image": {
+              "src": "surgical-robot-512-i3d/baked-xuastc.webp",
+              "width": 544,
+              "height": 688,
+              "effectiveWidth": 544,
+              "bytes": 263292,
+              "posterBytes": 25210
+            }
+          }
+        ]
+      },
+      {
+        "size": 1024,
+        "variants": [
+          {
+            "id": "pbr",
+            "name": "Live light",
+            "src": "surgical-robot-1024-i3d/live.i3d",
+            "assetBytes": 807868,
+            "runtimeGzip": 47541,
+            "totalGzip": 855840,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 53.74733424966223,
+            "textureBytes": 23420437,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "surgical-robot-1024-i3d/live.webp",
+              "width": 1104,
+              "height": 1396,
+              "effectiveWidth": 1104,
+              "bytes": 878032,
+              "posterBytes": 70156
+            }
+          },
+          {
+            "id": "pbr-xuastc",
+            "name": "Live light – XUASTC",
+            "src": "surgical-robot-1024-i3d/live-xuastc.i3d",
+            "assetBytes": 926868,
+            "runtimeGzip": 197026,
+            "totalGzip": 1124327,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 55.81447463541256,
+            "block": "4x4",
+            "textureBytes": 17128981,
+            "textureFormat": "astc",
+            "image": {
+              "src": "surgical-robot-1024-i3d/live-xuastc.webp",
+              "width": 1104,
+              "height": 1396,
+              "effectiveWidth": 1104,
+              "bytes": 997244,
+              "posterBytes": 70368
+            }
+          },
+          {
+            "id": "baked",
+            "name": "Baked studio",
+            "src": "surgical-robot-1024-i3d/baked.i3d",
+            "assetBytes": 514120,
+            "runtimeGzip": 47541,
+            "totalGzip": 562091,
+            "codec": "avif",
+            "quality": 95,
+            "codecPsnr": 50.305420837840444,
+            "textureBytes": 12934676,
+            "textureFormat": "rgba",
+            "image": {
+              "src": "surgical-robot-1024-i3d/baked.webp",
+              "width": 1104,
+              "height": 1396,
+              "effectiveWidth": 1104,
+              "bytes": 582402,
+              "posterBytes": 68274
+            }
+          },
+          {
+            "id": "baked-xuastc",
+            "name": "Baked studio – XUASTC",
+            "src": "surgical-robot-1024-i3d/baked-xuastc.i3d",
+            "assetBytes": 684940,
+            "runtimeGzip": 197026,
+            "totalGzip": 882400,
+            "codec": "xuastc",
+            "quality": 95,
+            "codecPsnr": 48.735786671900094,
+            "block": "4x4",
+            "textureBytes": 9788948,
+            "textureFormat": "astc",
+            "image": {
+              "src": "surgical-robot-1024-i3d/baked-xuastc.webp",
+              "width": 1104,
+              "height": 1396,
+              "effectiveWidth": 1104,
+              "bytes": 753158,
+              "posterBytes": 68210
+            }
+          }
+        ]
+      }
+    ]
   }
 ]

@@ -7,8 +7,9 @@ const number=(params,key,fallback,min,max)=>{const raw=params.get(key),value=raw
 export function readState(search,models){
  const p=new URLSearchParams(search),state={...defaults};
  const model=models.find(m=>m.id===p.get('model'))??models[0];state.model=model.id;
- const requested=model.resolutions.find(r=>r.size===Number(p.get('resolution'))),resolution=requested??model.resolutions[0];state.resolution=p.get('appearance')==='webp'?resolution.size:requested?.size??'auto';
+ const requested=model.resolutions.find(r=>r.size===Number(p.get('resolution'))),resolution=requested??model.resolutions[0];
  state.appearance=resolution.variants.some(v=>v.id===p.get('appearance'))?p.get('appearance'):defaults.appearance;
+ state.resolution=state.appearance==='webp'?resolution.size:requested?.size??'auto';
  for(const key of flags){const value=p.get(key);if(['1','true','0','false'].includes(value))state[key]=value==='1'||value==='true';}
  for(const [name,rule] of Object.entries(inputActions)){const value=p.get(name);if(rule.values.includes(value))state[name]=value;}
  for(const [key,min,max]of [['yaw',-1e6,1e6],['pitch',-1.5,1.5],['distance',1.8,15],['size',80,360]])state[key]=number(p,key,defaults[key],min,max);

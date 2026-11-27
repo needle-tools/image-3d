@@ -143,6 +143,62 @@
           "sha256": "8eeda38365f4f63f3830a4e1fba8bd2a68e73174f265d958ad9857a8c2bda093"
         }
       }
+    },
+    {
+      "id": "sneaker",
+      "label": "Materials Variants Shoe",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/sneaker-512.glb",
+          "sha256": "5fd70962b7f53074cf5118475127f195bea2ad0ea7cad120e9010ed7adb70d5d"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/sneaker-1024.glb",
+          "sha256": "8684758a5a49690e556f1f5c0687ae87c87c1185a73c0b607a163c91d90cf5e2"
+        }
+      }
+    },
+    {
+      "id": "v8-engine",
+      "label": "V8 Engine",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/v8-engine-512.glb",
+          "sha256": "f823d43a1b5d56e45c96b9969eb446aa4a2426b19c0bb83079bec9efe06c1dde"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/v8-engine-1024.glb",
+          "sha256": "5cfd7dc8d9c9dcaf70718999813d5e2eb9458de7aa31fb8aba1fa59902eee320"
+        }
+      }
+    },
+    {
+      "id": "anesthesia-machine",
+      "label": "Anesthesia Machine",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/anesthesia-machine-512.glb",
+          "sha256": "23f35ec7621a614325e5b522a8761770cd22df0f74dd808261a392850727c15a"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/anesthesia-machine-1024.glb",
+          "sha256": "39d20378c0162b18f1a4f6ac8a2804096038fe7ce28b38fd8542d1f19dccf1cb"
+        }
+      }
+    },
+    {
+      "id": "surgical-robot",
+      "label": "Surgical Robot",
+      "captures": {
+        "512": {
+          "file": "tests/fixtures/captures/surgical-robot-512.glb",
+          "sha256": "20bd4e17f6474031a8d3b5914bb6ff37e34eb85d6f5dd93321b5d3bc33bc75e5"
+        },
+        "1024": {
+          "file": "tests/fixtures/captures/surgical-robot-1024.glb",
+          "sha256": "b8a0cab9c7944ffa82103b61bf42642162a157049d0012d1a3c97ea706c9e9c1"
+        }
+      }
     }
   ]
 }

@@ -16,6 +16,8 @@ test('demo URLs validate settings and round-trip camera and controls',()=>{
  const state=readState('?model=watch&resolution=1024&appearance=pbr-xuastc&grid=1&light=1&reference=1&hover=1&hover-action=look-at&touch-drag-action=orbit-environment&follow=0&size=100&measurements=1&yaw=-1.2&pitch=.4&distance=3.6',models);
  assert.deepEqual(state,{model:'watch',resolution:1024,appearance:'pbr-xuastc',native:false,grid:true,light:true,reference:true,hover:true,follow:false,fixed:true,size:100,measurements:true,yaw:-1.2,pitch:.4,distance:3.6,
   'hover-action':'look-at','mouse-drag-action':'orbit-environment','touch-drag-action':'orbit-environment','touch-pinch-action':'zoom-model'});
+ const unavailable=readState('?model=sneaker&appearance=webp',models);
+ assert.equal(unavailable.appearance,'baked');assert.equal(unavailable.resolution,'auto');
  const url=stateUrl('https://example.com/demo?campaign=test#view',state);assert.equal(url.searchParams.get('campaign'),'test');assert.equal(url.hash,'#view');assert.deepEqual(readState(url.search,models),state);
  assert.equal(stateUrl('https://example.com/',defaults).search,'');assert.deepEqual(readState('?model=unknown&resolution=17&appearance=unknown&follow=oops&yaw=NaN&distance=Infinity',models),defaults);
  assert.equal(readState('?fixed=0',models).fixed,false);

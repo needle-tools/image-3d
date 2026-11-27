@@ -45,7 +45,7 @@ test('one comparison page switches models, resolutions, appearance, references a
   const catalog=JSON.parse(await readFile(resolve(root,'comparison.json'),'utf8'));
   const viewerBytes=gzipSync(await readFile('dist/img-3d.js')).length;
   assert(catalog.every(m=>m.resolutions.every(r=>r.variants.filter(v=>v.id!=='webp'&&!v.id.endsWith('xuastc')).every(v=>v.runtimeGzip===viewerBytes))),'Comparison uses an outdated viewer size');
-  assert.deepEqual(catalog.map(m=>m.id).sort(),['bike','boat','chess','decor','handbag','knight','motorcycle','motorhome','owl','watch']);
+  assert.deepEqual(catalog.map(m=>m.id).sort(),['anesthesia-machine','sneaker','surgical-robot','v8-engine','bike','boat','chess','decor','handbag','knight','motorcycle','motorhome','owl','watch'].sort());
   assert.deepEqual(catalog.find(m=>m.id==='handbag').resolutions.map(r=>r.size),[256,512,1024]);
   let count=0;
   for(const model of catalog)for(const resolution of model.resolutions)for(const variant of resolution.variants){
@@ -57,7 +57,10 @@ test('one comparison page switches models, resolutions, appearance, references a
     assert.equal(await page.getByLabel('Reference',{exact:true}).isVisible(),false);
     assert.equal(await page.locator('#referenceFigure').isVisible(),false,'Source turntable showed a missing reference image');
    }
-   if(variant.id!=='webp'&&await page.getByLabel('Reference',{exact:true}).isChecked()){
+   if(!resolution.turntable){
+    assert.equal(await page.getByLabel('Reference',{exact:true}).isVisible(),false);
+    assert.equal(await page.locator('#referenceFigure').isVisible(),false);
+   }else if(variant.id!=='webp'&&await page.getByLabel('Reference',{exact:true}).isChecked()){
     const src=resolution.variants.find(v=>v.id==='webp').src;
     await page.waitForFunction(({src,size})=>{const ref=document.querySelector('#referenceViewer'),viewer=document.querySelector('#viewer');return ref.src===src&&ref.data&&ref.image.naturalWidth===size&&ref.image.src.includes(src.replace('model.json','view-'))&&viewer.pitch===ref.data.pitch&&viewer.yaw===ref.frame*Math.PI*2/ref.data.frames.length;},{src,size:resolution.size});
    }
@@ -66,7 +69,10 @@ test('one comparison page switches models, resolutions, appearance, references a
     const before=await page.evaluate(()=>document.querySelector('#viewer').yaw),box=await page.locator('#viewer canvas').boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+30,box.y+box.height/2);await page.mouse.up();await page.waitForFunction(before=>Math.abs(document.querySelector('#viewer').yaw-before)>.1,before);assert.equal(await page.evaluate(()=>document.querySelector('#viewer').yaw===document.querySelector('#referenceViewer').frame*Math.PI/16),true,'Dragging the 3D pane did not match the WebP frame');assert.equal(await page.getByLabel('Reference',{exact:true}).isChecked(),true);assert.equal(await page.evaluate(()=>document.querySelector('#viewer').pitch),.2);
    }
   }
-  assert.equal(count,105,'Expected five appearances for each of the 21 captures');
+  assert.equal(count,catalog.reduce((total,m)=>total+m.resolutions.reduce((n,r)=>n+4+Number(!!r.turntable),0),0));
+  await page.getByLabel('Model',{exact:true}).selectOption('owl');
+  await page.getByLabel('Appearance',{exact:true}).selectOption('webp');
+  await page.waitForFunction(()=>document.querySelector('#turntable').image?.complete&&document.querySelector('#turntable').src.includes('owl-'));
   assert.equal(await page.locator('#turntable').isVisible(),true);assert.equal(await page.getByLabel('Move light',{exact:true}).isVisible(),false);
   const frame=await page.evaluate(()=>document.querySelector('#turntable').frame);await page.locator('#turntable img').press('ArrowRight');await page.waitForFunction(frame=>document.querySelector('#turntable').frame===(frame+1)%32,frame);
   assert.equal(await page.evaluate(()=>document.querySelector('#turntable').pitch),.2);
@@ -81,7 +87,8 @@ test('one comparison page switches models, resolutions, appearance, references a
    assert.equal(await page.getByLabel('Model',{exact:true}).isVisible(),false);assert.equal(await page.getByLabel('Item size',{exact:true}).isEnabled(),true);assert.equal(await page.getByLabel('Follow mouse',{exact:true}).isEnabled(),true);
    const actual=await page.locator('#grid '+tag).evaluateAll(tiles=>tiles.map(el=>({model:el.dataset.model,src:el.src})));
    const size=Number(await page.getByLabel('Resolution',{exact:true}).inputValue()),mode=await page.getByLabel('Appearance',{exact:true}).inputValue();
-   assert.deepEqual(actual,Array.from({length:120},(_,i)=>{const m=catalog[i%catalog.length];const v=m.resolutions.find(r=>r.size===size).variants.find(v=>v.id===mode);return{model:m.id,src:v.image?.src??v.src};}));
+   const available=catalog.filter(m=>m.resolutions.find(r=>r.size===size)?.variants.some(v=>v.id===mode));
+   assert.deepEqual(actual,Array.from({length:120},(_,i)=>{const m=available[i%available.length];const v=m.resolutions.find(r=>r.size===size).variants.find(v=>v.id===mode);return{model:m.id,src:v.image?.src??v.src};}));
   };
   const follows=async(point,away=false,except=null)=>page.waitForFunction(({point,away,except})=>[...document.querySelectorAll('#grid img-3d,#grid img-turntable')].every(el=>{
    if(el.dataset.instance===except)return true;const r=el.getBoundingClientRect();if(r.bottom<=0||r.top>=innerHeight)return true;
