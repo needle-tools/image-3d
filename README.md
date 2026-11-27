@@ -157,7 +157,7 @@ If you're using the `<img-3d>` element, use `environment` instead:
 The viewer fetches and shares the roughly 35 kB map only when a preview requests it. For a self-hosted runtime, place `studio.json.gz` next to `img-3d.js`. With jsDelivr, the viewer loads the map from the same npm package version automatically.
 
 ```html
-<script type="module" src="https://cdn.jsdelivr.net/npm/@needle-tools/image-3d@0.1.3/dist/img-3d.js"></script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/@needle-tools/image-3d@0.1.4/dist/img-3d.js"></script>
 ```
 
 For custom integrations, the npm asset resolves at `@needle-tools/image-3d/env/studio`. For example, Vite can import its URL with `@needle-tools/image-3d/env/studio?url`. [Environment lighting API](https://github.com/needle-tools/image-3d/blob/main/docs/format.md)
