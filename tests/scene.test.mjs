@@ -102,3 +102,72 @@ test('one scene shares depth, fog, device and capture caches without canvas copi
   console.log('Shared depth, rotation, soft fog, blended capture, picking and scene cleanup passed.');
  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
 });
+
+test('a scene rebuilds its attachments after device loss at the same canvas size',{timeout:90000},async()=>{
+ const [runtime,capture]=await Promise.all([
+  readFile('dist/img-3d.js'),
+  readFile('demo/public/chess-512-i3d/live.webp'),
+ ]);
+ const server=createServer((req,res)=>{
+  if(req.url==='/runtime.js'){
+   res.setHeader('Content-Type','text/javascript');res.end(runtime);
+  }else if(req.url==='/capture.webp'){
+   res.end(capture);
+  }else{
+   res.setHeader('Content-Type','text/html');
+   res.end('<!doctype html><canvas width="320" height="240"></canvas>');
+  }
+ });
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ const browser=await chromium.launch({channel:'chrome'});
+ try{
+  const page=await browser.newPage();
+  await page.goto(`http://127.0.0.1:${server.address().port}`);
+  const result=await page.evaluate(async()=>{
+   const devices=[],errors=[],requestDevice=GPUAdapter.prototype.requestDevice;
+   GPUAdapter.prototype.requestDevice=async function(...args){
+    const device=await requestDevice.apply(this,args);
+    device.addEventListener('uncapturederror',event=>errors.push(event.error.message.split('\n')[0]));
+    devices.push(device);
+    return device;
+   };
+   let notifyLoss;
+   const lost=new Promise(resolve=>{notifyLoss=resolve;});
+   const {createImg3dScene}=await import('/runtime.js');
+   const canvas=document.querySelector('canvas');
+   const scene=await createImg3dScene(canvas,{onDeviceLost:notifyLoss});
+   await scene.load([{src:'/capture.webp'}]);
+   const camera={eye:[0,5,12],target:[0,1,0]};
+   await scene.draw(camera);
+   await devices[0].queue.onSubmittedWorkDone();
+   const before=canvas.toDataURL();
+
+   const raf=window.requestAnimationFrame;
+   let holdFrame;
+   const requested=new Promise(resolve=>{holdFrame=resolve;});
+   window.requestAnimationFrame=callback=>{holdFrame(callback);return 0;};
+   const pending=scene.draw(camera);
+   const frame=await requested;
+   window.requestAnimationFrame=raf;
+   devices[0].destroy();
+   const reason=await lost;
+   requestAnimationFrame(frame);
+   const drewOnLostDevice=await pending;
+
+   const recovered=await scene.draw(camera);
+   const after=canvas.toDataURL();
+   await scene.draw(camera);
+   await devices[1].queue.onSubmittedWorkDone();
+   scene.dispose();
+   return {devices:devices.length,reason,recovered,drewOnLostDevice,errors,before,after};
+  });
+  assert.equal(result.reason,'destroyed');
+  assert.equal(result.devices,2);
+  assert.deepEqual(result.errors,[],'Recovery emitted GPU validation errors');
+  assert.equal(result.drewOnLostDevice,false,'A queued draw used the device after loss');
+  assert.equal(result.recovered,true);
+  assert.equal(result.after,result.before,'The scene changed after same-size device recovery');
+  const pixels=await sharp(Buffer.from(result.after.split(',')[1],'base64')).ensureAlpha().raw().toBuffer();
+  assert(pixels.some((value,index)=>index%4===3&&value>127),'Recovered scene has no opaque pixels');
+ }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
+});

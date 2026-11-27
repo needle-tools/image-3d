@@ -739,20 +739,21 @@ export async function createImg3dScene(canvas,{lighting,signal,onDeviceLost}={})
  async function draw(settings){
   if(disposed||document.hidden)return false;lastSettings=settings;
   const backendApi=await backend();if(!backendApi)throw Error('Image3D scenes require WebGPU');
+  const canDraw=()=>!disposed&&!document.hidden&&api===backendApi;
   if(owner!==backendApi)await backendApi.prepareScene();
   if(instances.some(item=>item&&(item.asset.disposed||item.asset.api!==backendApi)))await load(placements);
-  if(disposed)return false;
-  if(owner!==backendApi){owner.forgetScene(target);target.device=null;owner=backendApi;}
+  if(!canDraw())return false;
+  if(owner!==backendApi){owner.forgetScene(target);owner=backendApi;}
   if(pendingDraw)return pendingDraw;
   pendingDraw=new Promise((resolve,reject)=>{
    resolveDraw=resolve;
    // Keep at most three frames in flight without a full GPU fence on every frame.
    (gpuFrames.size>=3?Promise.race(gpuFrames):Promise.resolve()).then(()=>{
-    if(disposed||document.hidden){pendingDraw=null;resolveDraw=null;resolve(false);return;}
+    if(!canDraw()){pendingDraw=null;resolveDraw=null;resolve(false);return;}
     drawFrame=requestAnimationFrame(()=>{
     drawFrame=0;
     try{
-     if(disposed||document.hidden){resolve(false);return;}
+     if(!canDraw()){resolve(false);return;}
      const settings=typeof lastSettings==='function'?lastSettings():lastSettings;
      hitBoxes=backendApi.renderScene(target,canvas,instances,settings,record.lighting,fitInstances);
      const completed=backendApi.device.queue.onSubmittedWorkDone().then(()=>gpuFrames.delete(completed),()=>gpuFrames.delete(completed));gpuFrames.add(completed);

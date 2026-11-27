@@ -378,7 +378,7 @@ async function setup(device,format,features){
  function shadePipeline(item,mode=''){
   const light=item.el.lighting,key=item.asset.data.appearance==='baked'?'baked':enhanced(light)?light.lights?.length?'cinematic':'studio':'pbr';return pipelines[key+mode];
  }
- const sceneTargets=new Set();
+ const sceneTargets=new Map();
  const targets=new Map(),pool=[],elementIds=new WeakMap();let tick=0,serial=0,retained=null;
  // Each translucent box retains its visibility for light-only updates.
  // Offscreen owners release it; inactive sizes expire after frame submission.
@@ -391,7 +391,7 @@ async function setup(device,format,features){
  }
  function evict(){for(const [key,t]of targets)if(tick-t.used>60||targets.size>16&&t.used<tick-1){for(const x of t.textures)x.destroy();targets.delete(key);}}
  function trimEnvironments(active){for(const [e,r]of environments)if(!active.has(e)){r.texture.destroy();environments.delete(e);}}
- function release(){for(const record of [...sceneTargets])forgetScene(record);for(const e of environments.values())e.texture.destroy();environments.clear();retained=null;for(const t of atlas?.textures??[])t.destroy();atlas=null;for(const t of targets.values())for(const x of t.textures)x.destroy();targets.clear();for(const p of pool)p.buffer.destroy();pool.length=0;}
+ function release(){for(const scene of sceneTargets.keys())forgetScene(scene);for(const e of environments.values())e.texture.destroy();environments.clear();retained=null;for(const t of atlas?.textures??[])t.destroy();atlas=null;for(const t of targets.values())for(const x of t.textures)x.destroy();targets.clear();for(const p of pool)p.buffer.destroy();pool.length=0;}
  function forget(el){
   retained?.entries.delete(el);const owner=elementIds.get(el);
   for(const [key,t]of targets)if(t.owner===owner){for(const x of t.textures)x.destroy();targets.delete(key);}
@@ -636,11 +636,22 @@ async function setup(device,format,features){
   return record;
  }
  function resolveGroup(image,record){return device.createBindGroup({layout:resolveLayout,entries:[{binding:0,resource:image.createView()},{binding:1,resource:sampler},{binding:2,resource:record.mask.createView()},{binding:3,resource:{buffer:record.buffer}}]});}
- function forgetScene(record){for(const t of record.textures??[])t.destroy();record.context?.unconfigure();record.textures=[];sceneTargets.delete(record);}
- function sceneTarget(record,canvas,w,h){
-  if(record.device!==device){record.context=canvas.getContext('webgpu');if(!record.context)throw Error('Scene requires a WebGPU canvas');record.context.configure({device,format,alphaMode:'premultiplied'});record.device=device;sceneTargets.add(record);}
+ function forgetScene(scene){
+  const record=sceneTargets.get(scene);if(!record)return;
+  for(const texture of record.textures)texture.destroy();
+  record.context.unconfigure();
+  sceneTargets.delete(scene);
+ }
+ function sceneTarget(scene,canvas,w,h){
+  // Attachments and the configured canvas belong to this renderer's device.
+  let record=sceneTargets.get(scene);
+  if(!record){
+   const context=canvas.getContext('webgpu');if(!context)throw Error('Scene requires a WebGPU canvas');
+   context.configure({device,format,alphaMode:'premultiplied'});
+   record={context,textures:[]};sceneTargets.set(scene,record);
+  }
   if(record.width!==w||record.height!==h){
-   for(const t of record.textures??[])t.destroy();record.textures=[];
+   for(const t of record.textures)t.destroy();record.textures=[];
    const make=format=>{const t=device.createTexture({size:[w,h],format,usage:GPUTextureUsage.RENDER_ATTACHMENT|GPUTextureUsage.TEXTURE_BINDING});record.textures.push(t);return t;};
    record.color=make(format);record.id=make('r32uint');record.depth=make('depth32float');record.read=aux(record.id,record.depth);record.clip=aux(none[0],record.depth);record.width=w;record.height=h;record.bytes=w*h*12;
   }
@@ -695,7 +706,7 @@ async function setup(device,format,features){
    }
    pass.end();
   }
-  const output=record.context.getCurrentTexture();
+  const output=a.context.getCurrentTexture();
   pass=encoder.beginRenderPass({colorAttachments:[{view:output.createView(),clearValue:[0,0,0,0],loadOp:'clear',storeOp:'store'}]});
   if(items.length){const item=items[0],r=shadowRecord(item.asset,null);pass.setPipeline(resolvePipeline);pass.setBindGroup(0,resolveGroup(a.color,r));const b=item.asset.batches[0],[uniforms,offset]=slot(f,item.view,item.el,b,item.asset.data.pages[b.page],0,[0,0,w,h]);pass.setBindGroup(1,uniforms,[offset]);pass.draw(3);}pass.end();
   for(const {buffer,slots}of f.segments){const all=new Uint8Array(slots.length*SLOT);slots.forEach((s,i)=>all.set(new Uint8Array(s),i*SLOT));device.queue.writeBuffer(buffer,0,all);}
@@ -703,5 +714,5 @@ async function setup(device,format,features){
   return items.map(item=>({...sceneBounds(shared,item.instance,w,h),index:item.index}));
  }
  return{device,format,features,maxTexture:device.limits.maxTextureDimension2D,upload,destroy,frame,present,submit,release,forget,trimEnvironments,renderScene,prepareScene,forgetScene,
-  get sceneContexts(){return sceneTargets.size;},get environmentBytes(){return [...environments.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0);},get attachmentBytes(){return[...targets.values()].reduce((sum,t)=>sum+t.bytes,0)+(atlas?.bytes??0)+[...sceneTargets].reduce((sum,t)=>sum+(t.bytes??0),0);},get validationErrors(){return validationErrors;}};
+  get sceneContexts(){return sceneTargets.size;},get environmentBytes(){return [...environments.keys()].reduce((n,e)=>n+(e?.data.byteLength??0),0);},get attachmentBytes(){return[...targets.values()].reduce((sum,t)=>sum+t.bytes,0)+(atlas?.bytes??0)+[...sceneTargets.values()].reduce((sum,t)=>sum+(t.bytes??0),0);},get validationErrors(){return validationErrors;}};
 }
